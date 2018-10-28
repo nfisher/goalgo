@@ -1,4 +1,4 @@
-SHELL := /bin/sh -o pipefail
+SHELL := /bin/bash -eu -o pipefail
 
 .PHONY: all
 all: install
