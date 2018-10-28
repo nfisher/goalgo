@@ -7,6 +7,7 @@ import (
 )
 
 func Test_add(t *testing.T) {
+	t.Parallel()
 	td := []struct {
 		name  string
 		set   intset.Set
@@ -29,6 +30,7 @@ func Test_add(t *testing.T) {
 }
 
 func Test_contains(t *testing.T) {
+	t.Parallel()
 	td := []struct {
 		name     string
 		set      intset.Set
@@ -49,6 +51,7 @@ func Test_contains(t *testing.T) {
 }
 
 func Test_remove(t *testing.T) {
+	t.Parallel()
 	td := []struct {
 		name  string
 		set   intset.Set
