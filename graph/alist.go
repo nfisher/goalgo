@@ -13,12 +13,16 @@ type AdjacencySet struct {
 }
 
 var (
+	// ErrCannotAddVertices is emitted when an invalid edge is specified in the creation of a new vertex.
 	ErrCannotAddVertices = errors.New("graph: cannot add vertices with invalid edges")
-	ErrCannotAddEdge     = errors.New("graph: cannot add edge with invalid vertices")
-	ErrVertexNotFound    = errors.New("graph: vertex not found")
+	// ErrCannotAddEdge is emitted when one or more of the vertices in an edge are invalid/non-existant.
+	ErrCannotAddEdge = errors.New("graph: cannot add edge with invalid vertices")
+	// ErrVertexNotFound is emitted when a vertex does not exist and therefore has no edge set.
+	ErrVertexNotFound = errors.New("graph: vertex not found")
 )
 
-func (as *AdjacencySet) Vertice(edges ...int) (id int, err error) {
+// Vertex adds a new vertex, optionally with the specified edges.
+func (as *AdjacencySet) Vertex(edges ...int) (id int, err error) {
 	edgeset := intset.New()
 	l := len(as.list)
 	for _, i := range edges {
@@ -34,6 +38,7 @@ func (as *AdjacencySet) Vertice(edges ...int) (id int, err error) {
 	return l, nil
 }
 
+// Edge adds an edge from v to w.
 func (as *AdjacencySet) Edge(v, w int) error {
 	l := len(as.list)
 	if v >= l {
@@ -50,6 +55,7 @@ func (as *AdjacencySet) Edge(v, w int) error {
 	return nil
 }
 
+// Adjacent returns all vertices adjacent to this vertex.
 func (as *AdjacencySet) Adjacent(v int) ([]int, error) {
 	if v >= len(as.list) {
 		return nil, ErrVertexNotFound
