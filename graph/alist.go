@@ -19,10 +19,36 @@ var (
 	ErrCannotAddEdge = errors.New("graph: cannot add edge with invalid vertices")
 	// ErrVertexNotFound is emitted when a vertex does not exist and therefore has no edge set.
 	ErrVertexNotFound = errors.New("graph: vertex not found")
+	// ErrNoVertices is emitted when the graph cannot carry out a calculation due to an absence of vertices.
+	ErrNoVertices = errors.New("graph: no vertices in graph")
 )
 
+// Average returns the average degree of the list.
+func Average(as *AdjacencyList) (float64, error) {
+	if as.Vertices() == 0 {
+		return -1.0, ErrNoVertices
+	}
+	return 2.0 * float64(as.Edges()) / float64(as.Vertices()), nil
+}
+
+// Max returns the max degree of the list.
+func Max(as *AdjacencyList) int {
+	var max int
+	for _, v := range as.list {
+		if len(v) > max {
+			max = len(v)
+		}
+	}
+	return max
+}
+
+// Degree returns the number of edges connected to the vertex.
 func Degree(as *AdjacencyList, v int) (int, error) {
-	return -1, nil
+	if v >= len(as.list) {
+		return -1, ErrVertexNotFound
+	}
+
+	return len(as.list[v]), nil
 }
 
 // Vertex adds a new vertex, optionally with the specified edges.

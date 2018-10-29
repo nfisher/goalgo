@@ -7,8 +7,52 @@ import (
 	"github.com/nfisher/goalgo/graph"
 )
 
+func Test_average_degree(t *testing.T) {
+	td := []struct {
+		name    string
+		list    *graph.AdjacencyList
+		average float64
+		err     error
+	}{
+		{"no vertices", newList(), -1.0, graph.ErrNoVertices},
+		{"with connections", newList(WithEdges(), WithEdges(), WithEdges(), AddEdge(1, 0), AddEdge(1, 2)), 2.0 / 3.0 * 2.0, nil},
+	}
+
+	for _, tc := range td {
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := graph.Average(tc.list)
+			if actual != tc.average {
+				t.Errorf("Average() = %v, want %v", actual, tc.average)
+			}
+			if err != tc.err {
+				t.Errorf("Average() err = %v, want %v", err, tc.err)
+
+			}
+		})
+	}
+}
+
+func Test_max_degree(t *testing.T) {
+	td := []struct {
+		name string
+		list *graph.AdjacencyList
+		max  int
+	}{
+		{"no connections", newList(WithEdges()), 0},
+		{"with connections", newList(WithEdges(), WithEdges(), WithEdges(), AddEdge(1, 0), AddEdge(1, 2)), 2},
+	}
+
+	for _, tc := range td {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := graph.Max(tc.list)
+			if actual != tc.max {
+				t.Errorf("Max() = %v, want %v", actual, tc.max)
+			}
+		})
+	}
+}
+
 func Test_degree(t *testing.T) {
-	t.Skip()
 	td := []struct {
 		name   string
 		list   *graph.AdjacencyList
@@ -17,7 +61,7 @@ func Test_degree(t *testing.T) {
 		err    error
 	}{
 		{"no connections", newList(WithEdges()), 0, 0, nil},
-		{"with connections", newList(WithEdges(), WithEdges(), WithEdges(0, 1)), 1, 2, nil},
+		{"with outbound connections", newList(WithEdges(), WithEdges(), WithEdges(), AddEdge(1, 0), AddEdge(1, 2)), 1, 2, nil},
 		{"out of range", newList(), 0, -1, graph.ErrVertexNotFound},
 	}
 
@@ -143,7 +187,19 @@ type Modifier func(*graph.AdjacencyList)
 
 func WithEdges(i ...int) Modifier {
 	return func(as *graph.AdjacencyList) {
-		as.Vertex(i...)
+		_, err := as.Vertex(i...)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+func AddEdge(v, w int) Modifier {
+	return func(as *graph.AdjacencyList) {
+		err := as.Edge(v, w)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
