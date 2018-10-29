@@ -6,6 +6,36 @@ import (
 	"github.com/nfisher/goalgo/graph"
 )
 
+func Test_edge(t *testing.T) {
+	td := []struct {
+		name string
+		list *graph.AdjacencySet
+		v    int
+		w    int
+		len  int
+		err  error
+	}{
+		{"add edge with valid vertices", newList(WithEdges(), WithEdges()), 0, 1, 1, nil},
+		{"add edge with valid vertices", newList(WithEdges(), WithEdges()), 0, 1, 1, nil},
+		{"rejects edge with invalid vertices", newList(), 0, 1, 0, graph.ErrCannotAddEdge},
+		{"rejects edge with invalid v vertices", newList(WithEdges()), 1, 0, 0, graph.ErrCannotAddEdge},
+		{"rejects edge with invalid w vertice", newList(WithEdges()), 0, 1, 0, graph.ErrCannotAddEdge},
+	}
+
+	for _, tc := range td {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.list.Edge(tc.v, tc.w)
+			if tc.err != err {
+				t.Errorf("list.Edge(%v, %v) = %v, want %v", tc.v, tc.w, err, tc.err)
+			}
+
+			if tc.len != tc.list.Edges() {
+				t.Errorf("list.Edges() = %v, want %v", tc.list.Edges(), tc.len)
+			}
+		})
+	}
+}
+
 func Test_vertice(t *testing.T) {
 	td := []struct {
 		name  string
