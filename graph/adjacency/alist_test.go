@@ -1,20 +1,22 @@
-package graph_test
+package adjacency_test
 
 import (
 	"reflect"
 	"testing"
 
 	"github.com/nfisher/goalgo/graph"
+	"github.com/nfisher/goalgo/graph/adjacency"
+	"github.com/nfisher/goalgo/graph/errors"
 )
 
 func Test_average_degree(t *testing.T) {
 	td := []struct {
 		name    string
-		list    *graph.AdjacencyList
+		list    *adjacency.List
 		average float64
 		err     error
 	}{
-		{"no vertices", newList(), -1.0, graph.ErrNoVertices},
+		{"no vertices", newList(), -1.0, errors.ErrNoVertices},
 		{"with connections", newList(WithEdges(), WithEdges(), WithEdges(), AddEdge(1, 0), AddEdge(1, 2)), 2.0 / 3.0 * 2.0, nil},
 	}
 
@@ -35,7 +37,7 @@ func Test_average_degree(t *testing.T) {
 func Test_max_degree(t *testing.T) {
 	td := []struct {
 		name string
-		list *graph.AdjacencyList
+		list *adjacency.List
 		max  int
 	}{
 		{"no connections", newList(WithEdges()), 0},
@@ -55,14 +57,14 @@ func Test_max_degree(t *testing.T) {
 func Test_degree(t *testing.T) {
 	td := []struct {
 		name   string
-		list   *graph.AdjacencyList
+		list   *adjacency.List
 		vertex int
 		degree int
 		err    error
 	}{
 		{"no connections", newList(WithEdges()), 0, 0, nil},
 		{"with outbound connections", newList(WithEdges(), WithEdges(), WithEdges(), AddEdge(1, 0), AddEdge(1, 2)), 1, 2, nil},
-		{"out of range", newList(), 0, -1, graph.ErrVertexNotFound},
+		{"out of range", newList(), 0, -1, errors.ErrVertexNotFound},
 	}
 
 	for _, tc := range td {
@@ -81,14 +83,14 @@ func Test_degree(t *testing.T) {
 func Test_adjacent(t *testing.T) {
 	td := []struct {
 		name     string
-		list     *graph.AdjacencyList
+		list     *adjacency.List
 		vertex   int
 		expected []int
 		err      error
 	}{
 		{"no vertices", newList(WithEdges(), WithEdges()), 1, nil, nil},
 		{"return adjacent vertices", newList(WithEdges(), WithEdges(0)), 1, []int{0}, nil},
-		{"error on invalid vertex", newList(), 0, nil, graph.ErrVertexNotFound},
+		{"error on invalid vertex", newList(), 0, nil, errors.ErrVertexNotFound},
 	}
 
 	for _, tc := range td {
@@ -107,7 +109,7 @@ func Test_adjacent(t *testing.T) {
 func Test_edge(t *testing.T) {
 	td := []struct {
 		name string
-		list *graph.AdjacencyList
+		list *adjacency.List
 		v    int
 		w    int
 		len  int
@@ -115,9 +117,9 @@ func Test_edge(t *testing.T) {
 	}{
 		{"add edge with valid vertices", newList(WithEdges(), WithEdges()), 0, 1, 1, nil},
 		{"add edge with valid vertices", newList(WithEdges(), WithEdges()), 0, 1, 1, nil},
-		{"rejects edge with invalid vertices", newList(), 0, 1, 0, graph.ErrCannotAddEdge},
-		{"rejects edge with invalid v vertices", newList(WithEdges()), 1, 0, 0, graph.ErrCannotAddEdge},
-		{"rejects edge with invalid w vertice", newList(WithEdges()), 0, 1, 0, graph.ErrCannotAddEdge},
+		{"rejects edge with invalid vertices", newList(), 0, 1, 0, errors.ErrCannotAddEdge},
+		{"rejects edge with invalid v vertices", newList(WithEdges()), 1, 0, 0, errors.ErrCannotAddEdge},
+		{"rejects edge with invalid w vertice", newList(WithEdges()), 0, 1, 0, errors.ErrCannotAddEdge},
 	}
 
 	for _, tc := range td {
@@ -137,7 +139,7 @@ func Test_edge(t *testing.T) {
 func Test_vertice(t *testing.T) {
 	td := []struct {
 		name  string
-		list  *graph.AdjacencyList
+		list  *adjacency.List
 		edges []int
 		id    int
 		err   error
@@ -145,7 +147,7 @@ func Test_vertice(t *testing.T) {
 		{"adds vertice to empty list", newList(), nil, 0, nil},
 		{"adds vertice to populated list", newList(WithEdges()), nil, 1, nil},
 		{"adds vertice with valid edge", newList(WithEdges()), []int{0}, 1, nil},
-		{"rejects vertice with invalid edge", newList(), []int{1}, -1, graph.ErrCannotAddVertices},
+		{"rejects vertice with invalid edge", newList(), []int{1}, -1, errors.ErrCannotAddVertices},
 	}
 
 	for _, tc := range td {
@@ -183,10 +185,10 @@ func Test_counters(t *testing.T) {
 	}
 }
 
-type Modifier func(*graph.AdjacencyList)
+type Modifier func(*adjacency.List)
 
 func WithEdges(i ...int) Modifier {
-	return func(as *graph.AdjacencyList) {
+	return func(as *adjacency.List) {
 		_, err := as.Vertex(i...)
 		if err != nil {
 			panic(err)
@@ -195,7 +197,7 @@ func WithEdges(i ...int) Modifier {
 }
 
 func AddEdge(v, w int) Modifier {
-	return func(as *graph.AdjacencyList) {
+	return func(as *adjacency.List) {
 		err := as.Edge(v, w)
 		if err != nil {
 			panic(err)
@@ -203,8 +205,8 @@ func AddEdge(v, w int) Modifier {
 	}
 }
 
-func newList(mm ...Modifier) *graph.AdjacencyList {
-	s := &graph.AdjacencyList{}
+func newList(mm ...Modifier) *adjacency.List {
+	s := &adjacency.List{}
 	for _, m := range mm {
 		m(s)
 	}
