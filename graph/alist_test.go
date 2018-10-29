@@ -1,10 +1,37 @@
 package graph_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/nfisher/goalgo/graph"
 )
+
+func Test_adjacent(t *testing.T) {
+	td := []struct {
+		name     string
+		list     *graph.AdjacencySet
+		vertex   int
+		expected []int
+		err      error
+	}{
+		{"no vertices", newList(WithEdges(), WithEdges()), 1, nil, nil},
+		{"return adjacent vertices", newList(WithEdges(), WithEdges(0)), 1, []int{0}, nil},
+		{"error on invalid vertex", newList(), 0, nil, graph.ErrVertexNotFound},
+	}
+
+	for _, tc := range td {
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := tc.list.Adjacent(tc.vertex)
+			if !reflect.DeepEqual(actual, tc.expected) {
+				t.Errorf("list.Adjacent(%v) = %v, want %v", tc.vertex, actual, tc.expected)
+			}
+			if err != tc.err {
+				t.Errorf("list.Adjacent(%v) err = %v, want %v", tc.vertex, err, tc.err)
+			}
+		})
+	}
+}
 
 func Test_edge(t *testing.T) {
 	td := []struct {

@@ -12,8 +12,11 @@ type AdjacencySet struct {
 	edges int
 }
 
-var ErrCannotAddVertices = errors.New("graph: cannot add vertices with invalid edges")
-var ErrCannotAddEdge = errors.New("graph: cannot add edge with invalid vertices")
+var (
+	ErrCannotAddVertices = errors.New("graph: cannot add vertices with invalid edges")
+	ErrCannotAddEdge     = errors.New("graph: cannot add edge with invalid vertices")
+	ErrVertexNotFound    = errors.New("graph: vertex not found")
+)
 
 func (as *AdjacencySet) Vertice(edges ...int) (id int, err error) {
 	edgeset := intset.New()
@@ -45,6 +48,19 @@ func (as *AdjacencySet) Edge(v, w int) error {
 	as.edges++
 
 	return nil
+}
+
+func (as *AdjacencySet) Adjacent(v int) ([]int, error) {
+	if v >= len(as.list) {
+		return nil, ErrVertexNotFound
+	}
+
+	var a []int
+	for k := range as.list[v] {
+		a = append(a, k)
+	}
+
+	return a, nil
 }
 
 // Vertices returns the number of vertices in the list.
