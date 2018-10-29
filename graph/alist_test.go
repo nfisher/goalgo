@@ -7,10 +7,37 @@ import (
 	"github.com/nfisher/goalgo/graph"
 )
 
+func Test_degree(t *testing.T) {
+	t.Skip()
+	td := []struct {
+		name   string
+		list   *graph.AdjacencyList
+		vertex int
+		degree int
+		err    error
+	}{
+		{"no connections", newList(WithEdges()), 0, 0, nil},
+		{"with connections", newList(WithEdges(), WithEdges(), WithEdges(0, 1)), 1, 2, nil},
+		{"out of range", newList(), 0, -1, graph.ErrVertexNotFound},
+	}
+
+	for _, tc := range td {
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := graph.Degree(tc.list, tc.vertex)
+			if actual != tc.degree {
+				t.Errorf("Degree(%v) = %v, want %v", tc.vertex, actual, tc.degree)
+			}
+			if err != tc.err {
+				t.Errorf("Degree(%v) err = %v, want %v", tc.vertex, err, tc.err)
+			}
+		})
+	}
+}
+
 func Test_adjacent(t *testing.T) {
 	td := []struct {
 		name     string
-		list     *graph.AdjacencySet
+		list     *graph.AdjacencyList
 		vertex   int
 		expected []int
 		err      error
@@ -36,7 +63,7 @@ func Test_adjacent(t *testing.T) {
 func Test_edge(t *testing.T) {
 	td := []struct {
 		name string
-		list *graph.AdjacencySet
+		list *graph.AdjacencyList
 		v    int
 		w    int
 		len  int
@@ -66,7 +93,7 @@ func Test_edge(t *testing.T) {
 func Test_vertice(t *testing.T) {
 	td := []struct {
 		name  string
-		list  *graph.AdjacencySet
+		list  *graph.AdjacencyList
 		edges []int
 		id    int
 		err   error
@@ -79,7 +106,7 @@ func Test_vertice(t *testing.T) {
 
 	for _, tc := range td {
 		t.Run(tc.name, func(t *testing.T) {
-			id, err := tc.list.Vertice(tc.edges...)
+			id, err := tc.list.Vertex(tc.edges...)
 			if id != tc.id {
 				t.Errorf("list.Add(%v) id = %v, want %v", tc.edges, id, tc.id)
 			}
@@ -112,16 +139,16 @@ func Test_counters(t *testing.T) {
 	}
 }
 
-type Modifier func(*graph.AdjacencySet)
+type Modifier func(*graph.AdjacencyList)
 
 func WithEdges(i ...int) Modifier {
-	return func(as *graph.AdjacencySet) {
-		as.Vertice(i...)
+	return func(as *graph.AdjacencyList) {
+		as.Vertex(i...)
 	}
 }
 
-func newList(mm ...Modifier) *graph.AdjacencySet {
-	s := &graph.AdjacencySet{}
+func newList(mm ...Modifier) *graph.AdjacencyList {
+	s := &graph.AdjacencyList{}
 	for _, m := range mm {
 		m(s)
 	}

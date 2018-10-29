@@ -6,8 +6,8 @@ import (
 	"github.com/nfisher/goalgo/sets/intset"
 )
 
-// AdjacencySet is an adjacency list using a set.
-type AdjacencySet struct {
+// AdjacencyList is an adjacency list using a set.
+type AdjacencyList struct {
 	list  []intset.Set
 	edges int
 }
@@ -21,8 +21,12 @@ var (
 	ErrVertexNotFound = errors.New("graph: vertex not found")
 )
 
+func Degree(as *AdjacencyList, v int) (int, error) {
+	return -1, nil
+}
+
 // Vertex adds a new vertex, optionally with the specified edges.
-func (as *AdjacencySet) Vertex(edges ...int) (id int, err error) {
+func (as *AdjacencyList) Vertex(edges ...int) (id int, err error) {
 	edgeset := intset.New()
 	l := len(as.list)
 	for _, i := range edges {
@@ -39,7 +43,7 @@ func (as *AdjacencySet) Vertex(edges ...int) (id int, err error) {
 }
 
 // Edge adds an edge from v to w.
-func (as *AdjacencySet) Edge(v, w int) error {
+func (as *AdjacencyList) Edge(v, w int) error {
 	l := len(as.list)
 	if v >= l {
 		return ErrCannotAddEdge
@@ -56,7 +60,7 @@ func (as *AdjacencySet) Edge(v, w int) error {
 }
 
 // Adjacent returns all vertices adjacent to this vertex.
-func (as *AdjacencySet) Adjacent(v int) ([]int, error) {
+func (as *AdjacencyList) Adjacent(v int) ([]int, error) {
 	if v >= len(as.list) {
 		return nil, ErrVertexNotFound
 	}
@@ -70,11 +74,11 @@ func (as *AdjacencySet) Adjacent(v int) ([]int, error) {
 }
 
 // Vertices returns the number of vertices in the list.
-func (as *AdjacencySet) Vertices() int {
+func (as *AdjacencyList) Vertices() int {
 	return len(as.list)
 }
 
 // Edges returns the number edges in the list.
-func (as *AdjacencySet) Edges() int {
+func (as *AdjacencyList) Edges() int {
 	return as.edges
 }
