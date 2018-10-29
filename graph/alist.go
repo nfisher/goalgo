@@ -2,13 +2,25 @@ package graph
 
 import (
 	"errors"
-
-	"github.com/nfisher/goalgo/sets/intset"
 )
+
+// Graph interface for various forms of graphs.
+type Graph interface {
+	Vertex(edges ...int) (id int, err error)
+	Edge(v, w int) error
+	Adjacent(v int) ([]int, error)
+	Vertices() int
+	Edges() int
+}
+
+// Directed returns a new directed graph.
+func Directed() *AdjacencyList {
+	return &AdjacencyList{}
+}
 
 // AdjacencyList is an adjacency list using a set.
 type AdjacencyList struct {
-	list  []intset.Set
+	list  [][]int
 	edges int
 }
 
@@ -24,42 +36,44 @@ var (
 )
 
 // Average returns the average degree of the list.
-func Average(as *AdjacencyList) (float64, error) {
-	if as.Vertices() == 0 {
+func Average(g Graph) (float64, error) {
+	if g.Vertices() == 0 {
 		return -1.0, ErrNoVertices
 	}
-	return 2.0 * float64(as.Edges()) / float64(as.Vertices()), nil
+	return 2.0 * float64(g.Edges()) / float64(g.Vertices()), nil
 }
 
 // Max returns the max degree of the list.
-func Max(as *AdjacencyList) int {
+func Max(g Graph) int {
 	var max int
-	for _, v := range as.list {
-		if len(v) > max {
-			max = len(v)
+	for i := 0; i < g.Vertices(); i++ {
+		adj, _ := g.Adjacent(i)
+		if len(adj) > max {
+			max = len(adj)
 		}
 	}
 	return max
 }
 
 // Degree returns the number of edges connected to the vertex.
-func Degree(as *AdjacencyList, v int) (int, error) {
-	if v >= len(as.list) {
-		return -1, ErrVertexNotFound
+func Degree(g Graph, v int) (int, error) {
+	adj, err := g.Adjacent(v)
+	if err != nil {
+		return -1, err
 	}
 
-	return len(as.list[v]), nil
+	return len(adj), nil
 }
 
 // Vertex adds a new vertex, optionally with the specified edges.
 func (as *AdjacencyList) Vertex(edges ...int) (id int, err error) {
-	edgeset := intset.New()
+	var edgeset []int
 	l := len(as.list)
 	for _, i := range edges {
 		if i >= l {
 			return -1, ErrCannotAddVertices
 		}
-		edgeset.Add(i)
+		edgeset = append(edgeset, i)
 	}
 
 	as.edges += len(edgeset)
@@ -79,7 +93,7 @@ func (as *AdjacencyList) Edge(v, w int) error {
 		return ErrCannotAddEdge
 	}
 
-	as.list[v].Add(w)
+	as.list[v] = append(as.list[v], w)
 	as.edges++
 
 	return nil
