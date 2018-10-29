@@ -1,4 +1,6 @@
 SHELL := /bin/bash -eu -o pipefail
+COVERAGE_PROFILE := results/coverage.out
+COVERAGE_HTML := results/coverage.html
 
 .PHONY: all
 all: install
@@ -8,8 +10,19 @@ install: test vet
 	go install -v ./...
 
 .PHONY: test
-test:
-	go test -v ./...
+test: $(COVERAGE_PROFILE)
+
+.PHONY: html
+html: $(COVERAGE_HTML)
+
+results:
+	mkdir -p results
+
+$(COVERAGE_PROFILE): results
+	go test -v -coverprofile=$(COVERAGE_PROFILE) ./...
+
+$(COVERAGE_HTML): $(COVERAGE_PROFILE)
+	go tool cover -html=$(COVERAGE_PROFILE) -o $(COVERAGE_HTML)
 
 .PHONY: vet
 vet:
