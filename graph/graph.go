@@ -12,7 +12,6 @@ func Directed() *adjacency.List {
 
 // Graph interface for various forms of graphs.
 type Graph interface {
-	Vertex(edges ...int) (id int, err error)
 	Edge(v, w int) error
 	Adjacent(v int) ([]int, error)
 	Vertices() int
