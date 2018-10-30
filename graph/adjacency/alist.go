@@ -1,6 +1,10 @@
 package adjacency
 
-import "github.com/nfisher/goalgo/graph/errors"
+import (
+	"encoding/json"
+
+	"github.com/nfisher/goalgo/graph/errors"
+)
 
 // List is an adjacency list using an array.
 type List struct {
@@ -10,7 +14,7 @@ type List struct {
 
 // Vertex adds a new vertex, optionally with the specified edges.
 func (as *List) Vertex(edges ...int) (id int, err error) {
-	var edgeset []int
+	var edgeset = []int{}
 	l := len(as.list)
 	for _, i := range edges {
 		if i >= l {
@@ -64,4 +68,25 @@ func (as *List) Vertices() int {
 // Edges returns the number edges in the list.
 func (as *List) Edges() int {
 	return as.edges
+}
+
+// UnmarshalJSON populates the adjacency list from JSON.
+func (as *List) UnmarshalJSON(b []byte) error {
+	err := json.Unmarshal(b, &as.list)
+	if err != nil {
+		return err
+	}
+
+	var edges int
+	for _, v := range as.list {
+		edges += len(v)
+	}
+	as.edges = edges
+
+	return nil
+}
+
+// MarshalJSON encodes the adjacency list to JSON.
+func (as *List) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&as.list)
 }

@@ -1,6 +1,8 @@
 package adjacency_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -182,6 +184,41 @@ func Test_counters(t *testing.T) {
 				t.Errorf("len = %v, want %v", tc.actual, tc.expected)
 			}
 		})
+	}
+}
+
+func Test_EncodeJSON(t *testing.T) {
+	var buf bytes.Buffer
+	l := newList(WithEdges(), WithEdges(0), WithEdges(1), WithEdges(2), AddEdge(1, 3))
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(&l)
+	if err != nil {
+		t.Errorf("Encode() = %v, want nil", err)
+	}
+
+	expected := "[[],[0,3],[1],[2]]\n"
+	if buf.String() != expected {
+		t.Errorf("String() = %v, want %v", buf.String(), expected)
+	}
+}
+
+func Test_DecodeJSON(t *testing.T) {
+	input := "[[],[0,3],[1],[2]]\n"
+	buf := bytes.NewBufferString(input)
+	var as adjacency.List
+
+	dec := json.NewDecoder(buf)
+	err := dec.Decode(&as)
+	if err != nil {
+		t.Errorf("FromJSON() err = %v, want nil", err)
+	}
+
+	if as.Vertices() != 4 {
+		t.Errorf("Vertices() = %v, want 4", as.Vertices())
+	}
+
+	if as.Edges() != 4 {
+		t.Errorf("Edges() = %v, want 4", as.Edges())
 	}
 }
 
