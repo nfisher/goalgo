@@ -1,35 +1,32 @@
 package vclock
 
-import "errors"
-
+// VClock is a collection of logical clocks that combine to represent a vector clock.
 type VClock []int
 
-func Merge(vclocks []VClock) (VClock, error) {
+// Merge receives a collection of vector clocks and merges them into the least upper bound for each index.
+func Merge(vclocks []VClock) VClock {
 	cnt := len(vclocks)
 	if cnt < 1 {
-		return nil, nil
+		return nil
 	} else if cnt == 1 {
-		return vclocks[0], nil
+		return vclocks[0]
 	}
+
 	var merged = vclocks[0]
-	sz := len(merged)
 
 	for i := 1; i < cnt; i++ {
 		cur := vclocks[i]
-		if len(cur) != sz {
-			return nil, ErrVClockSizeMismatch
-		}
 
-		for i, v := range cur {
-			if v > merged[i] {
-				merged[i] = v
+		for j, v := range cur {
+			if j >= len(merged) {
+				merged = append(merged, v)
+			}
+
+			if v > merged[j] {
+				merged[j] = v
 			}
 		}
 	}
 
-	return merged, nil
+	return merged
 }
-
-var (
-	ErrVClockSizeMismatch = errors.New("vclock: size mismatch")
-)
