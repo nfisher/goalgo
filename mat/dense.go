@@ -33,7 +33,7 @@ func NewDense(rows, columns int, data []float64) *Dense {
 // Dot creates the dot product of two matrices.
 func Dot(a, b *Dense) (*Dense, error) {
 	var data []float64
-	if a.Columns()%8 == 0 {
+	if a.Columns() >= 8 {
 		data = largeDot(a, b)
 	} else {
 		data = smallDot(a, b)
@@ -44,13 +44,18 @@ func Dot(a, b *Dense) (*Dense, error) {
 
 // < 640ns/op
 func largeDot(a, b *Dense) []float64 {
-	var data = make([]float64, 0, a.Rows()*b.Columns())
 	acols := a.Columns()
 	bcols := b.Columns()
+	data := make([]float64, 0, a.Rows()*bcols)
+	bounded := acols
+	remainder := acols % 8
+	if remainder != 0 {
+		bounded = acols / 8 * 8
+	}
 	for ar := 0; ar < a.Rows(); ar++ {
 		for bc := 0; bc < bcols; bc++ {
 			var sum float64
-			for ac := 0; ac < acols; ac += 8 {
+			for ac := 0; ac < bounded; ac += 8 {
 				ai := ar*acols + ac
 				sum += a.data[ai] * b.data[bc]
 				sum += a.data[ai+1] * b.data[bc+1*bcols]
@@ -60,6 +65,11 @@ func largeDot(a, b *Dense) []float64 {
 				sum += a.data[ai+5] * b.data[bc+5*bcols]
 				sum += a.data[ai+6] * b.data[bc+6*bcols]
 				sum += a.data[ai+7] * b.data[bc+7*bcols]
+			}
+			for ac := bounded; ac < acols; ac++ {
+				ai := ar*acols + ac
+				bi := ac*bcols + bc
+				sum += a.data[ai] * b.data[bi]
 			}
 			data = append(data, sum)
 		}
