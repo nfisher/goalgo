@@ -7,8 +7,13 @@ COVERAGE_HTML := results/coverage.html
 all: install
 
 .PHONY: install
-install: test vet
+install: get test vet
 	go install -v ./...
+
+.PHONY: get
+get:
+	go get -d -u github.com/gonum/blas/blas64
+	go get -d -u github.com/gonum/matrix/mat64
 
 .PHONY: test
 test: $(COVERAGE_PROFILE)
