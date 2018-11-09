@@ -24,17 +24,6 @@ var ff = []struct {
 	{"gonum prefetch", mat.MulGonumNaivePrefetch},
 }
 
-func Test_GNProduct(t *testing.T) {
-	a := gnmat.NewDense(8, 8, eightByEight.Raw())
-	b := gnmat.NewDense(8, 8, eightByEightTwo.Raw())
-	c := gnmat.NewDense(8, 8, make([]float64, 64))
-	c.Product(a, b)
-	actual := c.RawMatrix().Data
-	if !reflect.DeepEqual(actual, eightByEightProduct) {
-		t.Errorf("got %v, want %v", actual, eightByEightProduct)
-	}
-}
-
 func Test_Product(t *testing.T) {
 	td := []struct {
 		name     string
@@ -68,7 +57,7 @@ func Test_Product(t *testing.T) {
 	}
 }
 
-func Benchmark_DotVector(b *testing.B) {
+func Benchmark_Dot(b *testing.B) {
 	aMat := mat.NewDense(1, 1024, aArr[:1024])
 	bMat := mat.NewDense(1024, 1, bArr[:1024])
 	cMat := mat.NewDense(1, 1, make([]float64, 1))
@@ -83,7 +72,7 @@ func Benchmark_DotVector(b *testing.B) {
 	}
 }
 
-func Benchmark_LargeProduct(b *testing.B) {
+func Benchmark_Product(b *testing.B) {
 	var sizes = sizes
 	if testing.Short() {
 		sizes = []int{1024}
@@ -109,17 +98,36 @@ func Benchmark_LargeProduct(b *testing.B) {
 // 7259547830 naive - ouch have lots of optimisation to do...
 // 126482249 gonum
 // 146958870
-func Benchmark_Gonum(b *testing.B) {
-	aMat := gnmat.NewDense(1024, 1024, aArr[:])
-	bMat := gnmat.NewDense(1024, 1024, bArr[:])
-	cMat := gnmat.NewDense(1024, 1024, nil)
+func Benchmark_ProductGonum(b *testing.B) {
+	var sizes = sizes
+	if testing.Short() {
+		sizes = []int{1024}
+	}
+	for _, sz := range sizes {
+		dim := sz * sz
+		aMat := gnmat.NewDense(sz, sz, aArr[:dim])
+		bMat := gnmat.NewDense(sz, sz, bArr[:dim])
+		cMat := gnmat.NewDense(sz, sz, nil)
 
-	b.Run("product", func(b *testing.B) {
-		for n := 0; n < b.N; n++ {
-			cMat.Product(aMat, bMat)
-		}
-	})
-	Result = cMat.RawMatrix()
+		b.Run(fmt.Sprintf("@n=%v", sz), func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				cMat.Product(aMat, bMat)
+			}
+		})
+		Result = cMat.RawMatrix()
+	}
+}
+
+func Test_GonumProduct(t *testing.T) {
+	a := gnmat.NewDense(8, 8, eightByEight.Raw())
+	b := gnmat.NewDense(8, 8, eightByEightTwo.Raw())
+	c := gnmat.NewDense(8, 8, make([]float64, 64))
+
+	c.Product(a, b)
+	actual := c.RawMatrix().Data
+	if !reflect.DeepEqual(actual, eightByEightProduct) {
+		t.Errorf("got %v, want %v", actual, eightByEightProduct)
+	}
 }
 
 var (

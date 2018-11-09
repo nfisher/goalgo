@@ -23,6 +23,10 @@ html: $(COVERAGE_HTML)
 
 .PHONY: benchmark
 benchmark:
+	go test -short -benchmem -bench=. ./...
+
+.PHONY: benchmarklong
+benchmarklong:
 	go test -benchmem -bench=. ./...
 
 results:

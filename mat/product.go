@@ -174,15 +174,19 @@ func MulDaxpy(c, a, b *Dense) error {
 func daxpy(n int, da float64, dx *Dense, incx int, accum *Dense, incAccum int) {
 	if incx == 1 && incAccum == 1 {
 		m := n % 4
+
 		if m != 0 {
 			for i := 0; i < m; i++ {
 				accum.data[i] = accum.data[i] + da*dx.data[i]
 			}
 		}
+
 		if n < 4 {
 			return
 		}
+
 		mp1 := m + 1
+
 		for i := mp1; i < n; i += 4 {
 			accum.data[i] = accum.data[i] + da*dx.data[i]
 			accum.data[i+1] = accum.data[i+1] + da*dx.data[i+1]
@@ -192,12 +196,15 @@ func daxpy(n int, da float64, dx *Dense, incx int, accum *Dense, incAccum int) {
 	} else {
 		ix := 0
 		iy := 0
+
 		if incx < 0 {
 			ix = (-n+1)*incx + 1
 		}
+
 		if incAccum < 0 {
 			iy = (-n+1)*incAccum + 1
 		}
+
 		for i := 0; i < n; i++ {
 			accum.data[iy] = accum.data[iy] + da*dx.data[ix]
 			ix = ix + incx
