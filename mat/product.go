@@ -1,5 +1,25 @@
 package mat
 
+// MulGaxpy is a General AXPY algorithm to multiple 2 matrices.
+// Author: @james-bowman
+func MulGaxpy(c, a, b *Dense) error {
+	aCols := a.Columns()
+	aRows := a.Rows()
+	bCols := b.Columns()
+	var data = c.data
+
+	// IKJ
+	for i := 0; i < aRows; i++ {
+		for k := 0; k < aCols; k++ {
+			s := a.data[i*aCols+k]
+			for j := 0; j < bCols; j++ {
+				data[i*bCols+j] += s * b.data[k*bCols+j]
+			}
+		}
+	}
+	return nil
+}
+
 // Author: @james-bowman
 func MulGonumNaivePrefetch(c, a, b *Dense) error {
 	aCols := a.Columns()
@@ -142,14 +162,12 @@ func MulNaive(c, a, b *Dense) error {
 
 	for ar := 0; ar < aRows; ar++ {
 		for bc := 0; bc < bCols; bc++ {
-			var sum float64
 			for ac := 0; ac < aCols; ac++ {
 				ai := ar*aCols + ac
 				bi := ac*bCols + bc
-				sum += a.data[ai] * b.data[bi]
+				di := ar*bCols + bc
+				data[di] += a.data[ai] * b.data[bi]
 			}
-			di := ar*bCols + bc
-			data[di] = sum
 		}
 	}
 
@@ -157,27 +175,41 @@ func MulNaive(c, a, b *Dense) error {
 }
 
 func MulDaxpy(c, a, b *Dense) error {
-	aCols := a.Columns()
-	aRows := a.Rows()
-	bCols := b.Columns()
-
-	for ac := 0; ac < aCols; ac++ {
-		for ar := 0; ar < ar; ar++ {
-			da := a.At(ar, ac)
-			daxpy(aRows, da, c, bCols, b, aCols)
-		}
-	}
-
 	return nil
 }
 
-func daxpy(n int, da float64, dx *Dense, incx int, accum *Dense, incAccum int) {
-	if incx == 1 && incAccum == 1 {
+func dgemm(da float64, a *Dense, b *Dense, c *Dense) {
+	/*
+		var tmp = make([]float64, a)
+		for i := 0; i < b.Columns(); i++ {
+			dgemv(da, a, 1)
+		}
+	*/
+}
+
+func dgemv(da float64, x *Dense, incx int, dy []float64, incy int) {
+	cols := x.Columns()
+	for i := 0; i < x.Rows(); i++ {
+		xpos := i * incx
+		daxpy(da, x.data[xpos:xpos+cols], incx, dy, incy)
+	}
+}
+
+func daxpy(da float64, dx []float64, incx int, dy []float64, incy int) {
+	for i := 0; i < len(dx); i += incx {
+		yi := i * incy
+		dy[yi] = dy[yi] + da*dx[i]
+	}
+}
+
+/*
+func daxpy(n int, da float64, dx []float64, incx int, dy []float64, incy int) {
+	if incx == 1 && incy == 1 {
 		m := n % 4
 
 		if m != 0 {
 			for i := 0; i < m; i++ {
-				accum.data[i] = accum.data[i] + da*dx.data[i]
+				dy[i] = dy[i] + da*dx[i]
 			}
 		}
 
@@ -188,10 +220,10 @@ func daxpy(n int, da float64, dx *Dense, incx int, accum *Dense, incAccum int) {
 		mp1 := m + 1
 
 		for i := mp1; i < n; i += 4 {
-			accum.data[i] = accum.data[i] + da*dx.data[i]
-			accum.data[i+1] = accum.data[i+1] + da*dx.data[i+1]
-			accum.data[i+2] = accum.data[i+2] + da*dx.data[i+2]
-			accum.data[i+3] = accum.data[i+3] + da*dx.data[i+3]
+			dy[i] = dy[i] + da*dx[i]
+			dy[i+1] = dy[i+1] + da*dx[i+1]
+			dy[i+2] = dy[i+2] + da*dx[i+2]
+			dy[i+3] = dy[i+3] + da*dx[i+3]
 		}
 	} else {
 		ix := 0
@@ -201,17 +233,18 @@ func daxpy(n int, da float64, dx *Dense, incx int, accum *Dense, incAccum int) {
 			ix = (-n+1)*incx + 1
 		}
 
-		if incAccum < 0 {
-			iy = (-n+1)*incAccum + 1
+		if incy < 0 {
+			iy = (-n+1)*incy + 1
 		}
 
 		for i := 0; i < n; i++ {
-			accum.data[iy] = accum.data[iy] + da*dx.data[ix]
+			dy[iy] = dy[iy] + da*dx[ix]
 			ix = ix + incx
-			iy = iy + incAccum
+			iy = iy + incy
 		}
 	}
 }
+*/
 
 // MulStride uses unrolled loops to create the dot product of two matrices.
 func MulStride(c, a, b *Dense) error {

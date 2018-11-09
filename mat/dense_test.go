@@ -15,13 +15,14 @@ var ff = []struct {
 	name    string
 	product func(c, a, b *mat.Dense) error
 }{
-	// WIP {"daxpy", mat.DotDaxpy},
+	//	{"daxpy", mat.MulDaxpy},
+	{"gaxpy", mat.MulGaxpy},
 	{"gonum mulprefetch", mat.MulMultiplePrefetch2},
+	{"gonum prefetch", mat.MulGonumNaivePrefetch},
 	{"gonum stride", mat.MulGonumStride},
+	{"gonum interface", mat.MulGonumNaive},
 	{"stride", mat.MulStride},
 	{"naive", mat.MulNaive},
-	{"gonum interface", mat.MulGonumNaive},
-	{"gonum prefetch", mat.MulGonumNaivePrefetch},
 }
 
 func Test_Product(t *testing.T) {
@@ -84,7 +85,7 @@ func Benchmark_Product(b *testing.B) {
 		cMat := mat.NewDense(sz, sz, make([]float64, dim))
 
 		for _, f := range ff {
-			b.Run(fmt.Sprintf("%s @n=%v", f.name, sz), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%s %v", f.name, sz), func(b *testing.B) {
 				for n := 0; n < b.N; n++ {
 					_ = f.product(cMat, aMat, bMat)
 				}
@@ -103,6 +104,7 @@ func Benchmark_ProductGonum(b *testing.B) {
 	if testing.Short() {
 		sizes = []int{1024}
 	}
+
 	for _, sz := range sizes {
 		dim := sz * sz
 		aMat := gnmat.NewDense(sz, sz, aArr[:dim])
@@ -114,6 +116,7 @@ func Benchmark_ProductGonum(b *testing.B) {
 				cMat.Product(aMat, bMat)
 			}
 		})
+
 		Result = cMat.RawMatrix()
 	}
 }
