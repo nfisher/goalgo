@@ -29,7 +29,6 @@ func MulGonumNaive(c, a, b *Dense) error {
 	aRows := a.Rows()
 	bCols := b.Columns()
 	for ar := 0; ar < aRows; ar++ {
-
 		for bc := 0; bc < bCols; bc++ {
 			var sum float64
 			for ac := 0; ac < aCols; ac++ {

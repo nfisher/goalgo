@@ -1,6 +1,7 @@
 package mat_test
 
 import (
+	"fmt"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -9,12 +10,6 @@ import (
 	"gonum.org/v1/gonum/blas/blas64"
 	gnmat "gonum.org/v1/gonum/mat"
 )
-
-var eightByEight = mat.NewDense(8, 8, []float64{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
-var eightByEightTwo = mat.NewDense(8, 8, []float64{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
-var eightByEightProduct = []float64{36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288}
-var vecTen = []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-var vecSixteen = []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 
 var ff = []struct {
 	name    string
@@ -73,13 +68,6 @@ func Test_Product(t *testing.T) {
 	}
 }
 
-func Benchmark_SmallProduct(b *testing.B) {
-	c := mat.NewDense(8, 8, make([]float64, 64))
-	for n := 0; n < b.N; n++ {
-		_ = mat.MulStride(c, eightByEight, eightByEightTwo)
-	}
-	DotResult = c
-}
 func Benchmark_DotVector(b *testing.B) {
 	aMat := mat.NewDense(1, 1024, aArr[:1024])
 	bMat := mat.NewDense(1024, 1, bArr[:1024])
@@ -96,17 +84,24 @@ func Benchmark_DotVector(b *testing.B) {
 }
 
 func Benchmark_LargeProduct(b *testing.B) {
-	aMat := mat.NewDense(1024, 1024, aArr[:])
-	bMat := mat.NewDense(1024, 1024, bArr[:])
-	cMat := mat.NewDense(1024, 1024, make([]float64, 1024*1024))
+	var sizes = sizes
+	if testing.Short() {
+		sizes = []int{1024}
+	}
+	for _, sz := range sizes {
+		dim := sz * sz
+		aMat := mat.NewDense(sz, sz, aArr[:dim])
+		bMat := mat.NewDense(sz, sz, bArr[:dim])
+		cMat := mat.NewDense(sz, sz, make([]float64, dim))
 
-	for _, f := range ff {
-		b.Run(f.name, func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				_ = f.product(cMat, aMat, bMat)
-			}
-			DotResult = cMat
-		})
+		for _, f := range ff {
+			b.Run(fmt.Sprintf("%s @n=%v", f.name, sz), func(b *testing.B) {
+				for n := 0; n < b.N; n++ {
+					_ = f.product(cMat, aMat, bMat)
+				}
+				DotResult = cMat
+			})
+		}
 	}
 }
 
@@ -114,12 +109,12 @@ func Benchmark_LargeProduct(b *testing.B) {
 // 7259547830 naive - ouch have lots of optimisation to do...
 // 126482249 gonum
 // 146958870
-func Benchmark_GonumProduct(b *testing.B) {
+func Benchmark_Gonum(b *testing.B) {
 	aMat := gnmat.NewDense(1024, 1024, aArr[:])
 	bMat := gnmat.NewDense(1024, 1024, bArr[:])
 	cMat := gnmat.NewDense(1024, 1024, nil)
 
-	b.Run("dot", func(b *testing.B) {
+	b.Run("product", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			cMat.Product(aMat, bMat)
 		}
@@ -130,9 +125,24 @@ func Benchmark_GonumProduct(b *testing.B) {
 var (
 	DotResult *mat.Dense
 	Result    blas64.General
-	aArr      [1048576]float64
-	bArr      [1048576]float64
+	aArr      [2048 * 2048]float64
+	bArr      [2048 * 2048]float64
 )
+
+var sizes = []int{
+	64,
+	128,
+	256,
+	512,
+	1024,
+	2048,
+}
+
+var eightByEight = mat.NewDense(8, 8, []float64{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
+var eightByEightTwo = mat.NewDense(8, 8, []float64{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
+var eightByEightProduct = []float64{36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288, 36, 72, 108, 144, 180, 216, 252, 288}
+var vecTen = []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+var vecSixteen = []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 
 func init() {
 	rand.Seed(173)
