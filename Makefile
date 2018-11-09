@@ -4,7 +4,7 @@ COVERAGE_PROFILE := results/coverage.out
 COVERAGE_HTML := results/coverage.html
 
 .PHONY: all
-all: install
+all: install benchmark
 
 .PHONY: install
 install: get test vet
@@ -12,8 +12,8 @@ install: get test vet
 
 .PHONY: get
 get:
-	go get -d -u github.com/gonum/blas/blas64
-	go get -d -u github.com/gonum/matrix/mat64
+	go get -d -u gonum.org/v1/gonum/mat
+	go get -d -u gonum.org/v1/gonum/blas/blas64
 
 .PHONY: test
 test: $(COVERAGE_PROFILE)
@@ -23,7 +23,7 @@ html: $(COVERAGE_HTML)
 
 .PHONY: benchmark
 benchmark:
-	go test -benchmem -cpuprofile=profile.out -run='^$$' github.com/nfisher/goalgo/mat -bench='^Benchmark_DotLarge$$' -benchtime=20s
+	go test -benchmem -bench=. -benchtime=10s ./...
 	#go test -benchmem -run=^$$ github.com/nfisher/goalgo/mat -bench=^Benchmark_Dot$$ -benchtime=20s
 
 results:

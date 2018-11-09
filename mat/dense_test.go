@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gonum/blas/blas64"
-	gnmat "github.com/gonum/matrix/mat64"
 	"github.com/nfisher/goalgo/mat"
+	"gonum.org/v1/gonum/blas/blas64"
+	gnmat "gonum.org/v1/gonum/mat"
 )
 
 var eightByEight = mat.NewDense(8, 8, []float64{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
@@ -17,14 +17,16 @@ var vecTen = []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 var vecSixteen = []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 
 var ff = []struct {
-	name string
-	dot  func(c, a, b *mat.Dense) error
+	name    string
+	product func(c, a, b *mat.Dense) error
 }{
-	{"daxpy", mat.DotDaxpy},
-	{"gonum stride", mat.DotGonumStride},
-	{"stride", mat.DotStride},
-	{"naive", mat.DotNaive},
-	{"gonum", mat.DotGonumNaive},
+	// WIP {"daxpy", mat.DotDaxpy},
+	{"gonum mulprefetch", mat.MulMultiplePrefetch2},
+	{"gonum stride", mat.MulGonumStride},
+	{"stride", mat.MulStride},
+	{"naive", mat.MulNaive},
+	{"gonum interface", mat.MulGonumNaive},
+	{"gonum prefetch", mat.MulGonumNaivePrefetch},
 }
 
 func Test_GNProduct(t *testing.T) {
@@ -38,7 +40,7 @@ func Test_GNProduct(t *testing.T) {
 	}
 }
 
-func Test_Dot(t *testing.T) {
+func Test_Product(t *testing.T) {
 	td := []struct {
 		name     string
 		a        *mat.Dense
@@ -58,7 +60,7 @@ func Test_Dot(t *testing.T) {
 		for _, tc := range td {
 			t.Run(f.name+" "+tc.name, func(t *testing.T) {
 				c := mat.NewDense(tc.a.Rows(), tc.b.Columns(), make([]float64, tc.a.Rows()*tc.b.Columns()))
-				err := f.dot(c, tc.a, tc.b)
+				err := f.product(c, tc.a, tc.b)
 				if err != tc.err {
 					t.Fatalf("err = %v, want %v", err, tc.err)
 				}
@@ -71,26 +73,13 @@ func Test_Dot(t *testing.T) {
 	}
 }
 
-func Benchmark_DotSmall(b *testing.B) {
+func Benchmark_SmallProduct(b *testing.B) {
 	c := mat.NewDense(8, 8, make([]float64, 64))
 	for n := 0; n < b.N; n++ {
-		_ = mat.DotStride(c, eightByEight, eightByEightTwo)
+		_ = mat.MulStride(c, eightByEight, eightByEightTwo)
 	}
 	DotResult = c
 }
-
-var aArr [1048576]float64
-var bArr [1048576]float64
-
-func init() {
-	rand.Seed(173)
-
-	for i := range aArr {
-		aArr[i] = rand.NormFloat64()
-		bArr[i] = rand.NormFloat64()
-	}
-}
-
 func Benchmark_DotVector(b *testing.B) {
 	aMat := mat.NewDense(1, 1024, aArr[:1024])
 	bMat := mat.NewDense(1024, 1, bArr[:1024])
@@ -99,14 +88,14 @@ func Benchmark_DotVector(b *testing.B) {
 	for _, f := range ff {
 		b.Run(f.name, func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				_ = f.dot(cMat, aMat, bMat)
+				_ = f.product(cMat, aMat, bMat)
 			}
 			DotResult = cMat
 		})
 	}
 }
 
-func Benchmark_DotLarge(b *testing.B) {
+func Benchmark_LargeProduct(b *testing.B) {
 	aMat := mat.NewDense(1024, 1024, aArr[:])
 	bMat := mat.NewDense(1024, 1024, bArr[:])
 	cMat := mat.NewDense(1024, 1024, make([]float64, 1024*1024))
@@ -114,7 +103,7 @@ func Benchmark_DotLarge(b *testing.B) {
 	for _, f := range ff {
 		b.Run(f.name, func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				_ = f.dot(cMat, aMat, bMat)
+				_ = f.product(cMat, aMat, bMat)
 			}
 			DotResult = cMat
 		})
@@ -124,7 +113,8 @@ func Benchmark_DotLarge(b *testing.B) {
 // 16214216899
 // 7259547830 naive - ouch have lots of optimisation to do...
 // 126482249 gonum
-func Benchmark_Gonum(b *testing.B) {
+// 146958870
+func Benchmark_GonumProduct(b *testing.B) {
 	aMat := gnmat.NewDense(1024, 1024, aArr[:])
 	bMat := gnmat.NewDense(1024, 1024, bArr[:])
 	cMat := gnmat.NewDense(1024, 1024, nil)
@@ -137,5 +127,18 @@ func Benchmark_Gonum(b *testing.B) {
 	Result = cMat.RawMatrix()
 }
 
-var DotResult *mat.Dense
-var Result blas64.General
+var (
+	DotResult *mat.Dense
+	Result    blas64.General
+	aArr      [1048576]float64
+	bArr      [1048576]float64
+)
+
+func init() {
+	rand.Seed(173)
+
+	for i := range aArr {
+		aArr[i] = rand.NormFloat64()
+		bArr[i] = rand.NormFloat64()
+	}
+}
