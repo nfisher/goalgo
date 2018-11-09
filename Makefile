@@ -23,8 +23,7 @@ html: $(COVERAGE_HTML)
 
 .PHONY: benchmark
 benchmark:
-	go test -benchmem -bench=. -benchtime=10s ./...
-	#go test -benchmem -run=^$$ github.com/nfisher/goalgo/mat -bench=^Benchmark_Dot$$ -benchtime=20s
+	go test -benchmem -bench=. ./...
 
 results:
 	mkdir -p results
