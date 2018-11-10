@@ -14,6 +14,7 @@ install: get test vet
 get:
 	go get -d -u gonum.org/v1/gonum/mat
 	go get -d -u gonum.org/v1/gonum/blas/blas64
+	go get -d -u gonum.org/v1/plot
 
 .PHONY: test
 test: $(COVERAGE_PROFILE)
@@ -25,9 +26,9 @@ html: $(COVERAGE_HTML)
 benchmark:
 	go test -short -benchmem -bench=. ./...
 
-.PHONY: benchmarklong
-benchmarklong:
-	go test -benchmem -bench=. ./...
+.PHONY: bmlong
+bmlong:
+	go test -benchmem -bench=^Benchmark_Product/.$$ ./...
 
 results:
 	mkdir -p results

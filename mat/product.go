@@ -48,6 +48,7 @@ func MulGonumNaive(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
 	bCols := b.Columns()
+
 	for ar := 0; ar < aRows; ar++ {
 		for bc := 0; bc < bCols; bc++ {
 			var sum float64
@@ -70,7 +71,7 @@ func MulMultiplePrefetch2(c, a, b *Dense) error {
 	var data = c.data
 
 	if aRows%4 != 0 {
-		return MulNaive(c, a, b)
+		return MulNaiveIKJ(c, a, b)
 	}
 
 	var sum0 float64
@@ -123,6 +124,7 @@ func MulGonumStride(c, a, b *Dense) error {
 	for ar := 0; ar < a.Rows(); ar++ {
 		for bc := 0; bc < bCols; bc++ {
 			var sum float64
+			di := ar*bCols + bc
 			for ac := 0; ac < bounded; ac += stride {
 				ac0 := ac
 				ac1 := ac0 + 1
@@ -145,7 +147,6 @@ func MulGonumStride(c, a, b *Dense) error {
 			for ac := bounded; ac < aCols; ac++ {
 				sum += a.At(ar, ac) * b.At(ac, bc)
 			}
-			di := ar*bCols + bc
 			data[di] = sum
 		}
 	}
@@ -154,7 +155,7 @@ func MulGonumStride(c, a, b *Dense) error {
 }
 
 // MulNaive uses simple iteration to create the dot product of two matrices.
-func MulNaive(c, a, b *Dense) error {
+func MulNaiveIKJ(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
 	bCols := b.Columns()
@@ -162,9 +163,109 @@ func MulNaive(c, a, b *Dense) error {
 
 	for ar := 0; ar < aRows; ar++ {
 		for bc := 0; bc < bCols; bc++ {
+			di := ar*bCols + bc
 			for ac := 0; ac < aCols; ac++ {
 				ai := ar*aCols + ac
 				bi := ac*bCols + bc
+				data[di] += a.data[ai] * b.data[bi]
+			}
+		}
+	}
+
+	return nil
+}
+
+func MulNaiveIJK(c, a, b *Dense) error {
+	aCols := a.Columns()
+	aRows := a.Rows()
+	bCols := b.Columns()
+	var data = c.data
+
+	for ar := 0; ar < aRows; ar++ {
+		for ac := 0; ac < aCols; ac++ {
+			ai := ar*aCols + ac
+			for bc := 0; bc < bCols; bc++ {
+				di := ar*bCols + bc
+				bi := ac*bCols + bc
+				data[di] += a.data[ai] * b.data[bi]
+			}
+		}
+	}
+
+	return nil
+}
+
+func MulNaiveKIJ(c, a, b *Dense) error {
+	aCols := a.Columns()
+	aRows := a.Rows()
+	bCols := b.Columns()
+	var data = c.data
+
+	for bc := 0; bc < bCols; bc++ {
+		for ar := 0; ar < aRows; ar++ {
+			di := ar*bCols + bc
+			for ac := 0; ac < aCols; ac++ {
+				ai := ar*aCols + ac
+				bi := ac*bCols + bc
+				data[di] += a.data[ai] * b.data[bi]
+			}
+		}
+	}
+
+	return nil
+}
+
+func MulNaiveJIK(c, a, b *Dense) error {
+	aCols := a.Columns()
+	aRows := a.Rows()
+	bCols := b.Columns()
+	var data = c.data
+
+	for ac := 0; ac < aCols; ac++ {
+		for ar := 0; ar < aRows; ar++ {
+			ai := ar*aCols + ac
+			for bc := 0; bc < bCols; bc++ {
+				di := ar*bCols + bc
+				bi := ac*bCols + bc
+				data[di] += a.data[ai] * b.data[bi]
+			}
+		}
+	}
+
+	return nil
+}
+
+func MulNaiveJKI(c, a, b *Dense) error {
+	aCols := a.Columns()
+	aRows := a.Rows()
+	bCols := b.Columns()
+	var data = c.data
+
+	for ac := 0; ac < aCols; ac++ {
+		for bc := 0; bc < bCols; bc++ {
+			bi := ac*bCols + bc
+			for ar := 0; ar < aRows; ar++ {
+				ai := ar*aCols + ac
+				di := ar*bCols + bc
+				data[di] += a.data[ai] * b.data[bi]
+			}
+		}
+	}
+
+	return nil
+}
+
+func MulNaiveKJI(c, a, b *Dense) error {
+	aCols := a.Columns()
+	aRows := a.Rows()
+	bCols := b.Columns()
+	var data = c.data
+
+	for bc := 0; bc < bCols; bc++ {
+		for ac := 0; ac < aCols; ac++ {
+			bi := ac*bCols + bc
+			for ar := 0; ar < aRows; ar++ {
+				ai := ar*aCols + ac
 				di := ar*bCols + bc
 				data[di] += a.data[ai] * b.data[bi]
 			}
@@ -265,6 +366,7 @@ func MulStride(c, a, b *Dense) error {
 	for ar := 0; ar < aRows; ar++ {
 		for bc := 0; bc < bCols; bc++ {
 			var sum float64
+			di := ar*bCols + bc
 			for ac := 0; ac < bounded; ac += stride {
 				b0 := ac*bCols + bc
 				b1 := b0 + bCols
@@ -297,7 +399,6 @@ func MulStride(c, a, b *Dense) error {
 				bi := ac*bCols + bc
 				sum += a.data[ai] * b.data[bi]
 			}
-			di := ar*bCols + bc
 			data[di] = sum
 		}
 	}

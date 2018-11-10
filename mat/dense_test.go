@@ -17,12 +17,17 @@ var ff = []struct {
 }{
 	//	{"daxpy", mat.MulDaxpy},
 	{"gaxpy", mat.MulGaxpy},
-	{"gonum mulprefetch", mat.MulMultiplePrefetch2},
-	{"gonum prefetch", mat.MulGonumNaivePrefetch},
-	{"gonum stride", mat.MulGonumStride},
-	{"gonum interface", mat.MulGonumNaive},
+	{"mulprefetch", mat.MulMultiplePrefetch2},
+	{"gni prefetch", mat.MulGonumNaivePrefetch},
+	{"gni stride", mat.MulGonumStride},
+	{"gni", mat.MulGonumNaive},
 	{"stride", mat.MulStride},
-	{"naive", mat.MulNaive},
+	{"naive IKJ", mat.MulNaiveIKJ},
+	{"naive IJK", mat.MulNaiveIJK},
+	{"naive JIK", mat.MulNaiveJIK},
+	{"naive JKI", mat.MulNaiveJKI},
+	{"naive KIJ", mat.MulNaiveKIJ},
+	{"naive KJI", mat.MulNaiveKJI},
 }
 
 func Test_Product(t *testing.T) {
@@ -133,11 +138,13 @@ func Test_GonumProduct(t *testing.T) {
 	}
 }
 
+const maxN = 2048
+
 var (
 	DotResult *mat.Dense
 	Result    blas64.General
-	aArr      [2048 * 2048]float64
-	bArr      [2048 * 2048]float64
+	aArr      [maxN * maxN]float64
+	bArr      [maxN * maxN]float64
 )
 
 var sizes = []int{
@@ -146,7 +153,6 @@ var sizes = []int{
 	256,
 	512,
 	1024,
-	2048,
 }
 
 var eightByEight = mat.NewDense(8, 8, []float64{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
