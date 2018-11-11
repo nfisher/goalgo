@@ -11,6 +11,13 @@ import (
 	gnmat "gonum.org/v1/gonum/mat"
 )
 
+func Test_Mul8(t *testing.T) {
+	abs := mat.Abs(-1.0)
+	if abs != 1.0 {
+		t.Errorf("abs = %v, want 1.0", abs)
+	}
+}
+
 var ff = []struct {
 	name    string
 	product func(c, a, b *mat.Dense) error
@@ -21,11 +28,11 @@ var ff = []struct {
 	{"block16 ijk", mat.MulBlockIJK(16)},
 	{"block32 ijk", mat.MulBlockIJK(32)},
 	{"block64 ijk", mat.MulBlockIJK(64)},
-	{"blockstride4 ijk", mat.MulBlockStrideIJK(4)},
-	{"blockstride8 ijk", mat.MulBlockStrideIJK(8)},
-	{"blockstride16 ijk", mat.MulBlockStrideIJK(16)},
-	{"blockstride32 ijk", mat.MulBlockStrideIJK(32)},
-	{"blockstride64 ijk", mat.MulBlockStrideIJK(64)},
+	{"blockunroll4 ijk", mat.MulBlockUnrollIJK(4)},
+	{"blockunroll8 ijk", mat.MulBlockUnrollIJK(8)},
+	{"blockunroll16 ijk", mat.MulBlockUnrollIJK(16)},
+	{"blockunroll32 ijk", mat.MulBlockUnrollIJK(32)},
+	{"blockunroll64 ijk", mat.MulBlockUnrollIJK(64)},
 	{"blockfetch2 ijk", mat.MulBlockFetchIJK(2)},
 	{"blockfetch4 ijk", mat.MulBlockFetchIJK(4)},
 	{"blockfetch8 ijk", mat.MulBlockFetchIJK(8)},
@@ -35,9 +42,9 @@ var ff = []struct {
 	{"gaxpy", mat.MulGaxpy},
 	{"mulprefetch", mat.MulMultiplePrefetch2},
 	{"gni prefetch", mat.MulGonumNaivePrefetch},
-	{"gni stride", mat.MulGonumStride},
+	{"gni unroll", mat.MulGonumUnroll},
 	{"gni", mat.MulGonumNaive},
-	{"stride", mat.MulStride},
+	{"unroll", mat.MulUnroll},
 	{"naive IKJ", mat.MulNaiveIKJ},
 	{"naive IJK", mat.MulNaiveIJK},
 	{"naive JIK", mat.MulNaiveJIK},

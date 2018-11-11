@@ -111,7 +111,7 @@ func MulMultiplePrefetch2(c, a, b *Dense) error {
 	return nil
 }
 
-func MulGonumStride(c, a, b *Dense) error {
+func MulGonumUnroll(c, a, b *Dense) error {
 	const stride = 8
 	aCols := a.Columns()
 	bCols := b.Columns()
@@ -312,8 +312,8 @@ func MulBlockIJK(blockSize int) func(c, a, b *Dense) error {
 	}
 }
 
-// MulBlockStrideIJK is lazily implemented if any of the dims aren't divisible by block size it defers to naive IJK.
-func MulBlockStrideIJK(blockSize int) func(c, a, b *Dense) error {
+// MulBlockUnrollIJK is lazily implemented if any of the dims aren't divisible by block size it defers to naive IJK.
+func MulBlockUnrollIJK(blockSize int) func(c, a, b *Dense) error {
 	return func(c, a, b *Dense) error {
 		aCols := a.Columns()
 		aRows := a.Rows()
@@ -389,8 +389,8 @@ func MulBlockFetchIJK(blockSize int) func(c, a, b *Dense) error {
 	}
 }
 
-// MulStride uses unrolled loops to create the dot product of two matrices.
-func MulStride(c, a, b *Dense) error {
+// MulUnroll uses unrolled loops to create the dot product of two matrices.
+func MulUnroll(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
 	bCols := b.Columns()
