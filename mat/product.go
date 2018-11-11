@@ -259,6 +259,7 @@ func MulNaiveKJI(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
 	bCols := b.Columns()
+
 	var data = c.data
 
 	for bc := 0; bc < bCols; bc++ {
@@ -275,6 +276,7 @@ func MulNaiveKJI(c, a, b *Dense) error {
 	return nil
 }
 
+// MulBlockIJK is lazily implemented if any of the dims aren't divisible by block size it defers to naive IJK.
 func MulBlockIJK(blockSize int) func(c, a, b *Dense) error {
 	return func(c, a, b *Dense) error {
 		aCols := a.Columns()
@@ -290,12 +292,16 @@ func MulBlockIJK(blockSize int) func(c, a, b *Dense) error {
 			for ac := 0; ac < aCols; ac += blockSize {
 				for bc := 0; bc < bCols; bc += blockSize {
 					for arb := ar; arb < ar+blockSize; arb++ {
+						dib := arb * bCols
+						aib := arb * aCols
 						for acb := ac; acb < ac+blockSize; acb++ {
-							ai := arb*aCols + acb
+							bib := acb * bCols
+							ai := aib + acb
+							s := a.data[ai]
 							for bcb := bc; bcb < bc+blockSize; bcb++ {
-								di := arb*bCols + bcb
-								bi := acb*bCols + bcb
-								data[di] += a.data[ai] * b.data[bi]
+								di := dib + bcb
+								bi := bib + bcb
+								data[di] += s * b.data[bi]
 							}
 						}
 					}
@@ -306,6 +312,7 @@ func MulBlockIJK(blockSize int) func(c, a, b *Dense) error {
 	}
 }
 
+// MulBlockIJK is lazily implemented if any of the dims aren't divisible by block size it defers to naive IJK.
 func MulBlockFetchIJK(blockSize int) func(c, a, b *Dense) error {
 	return func(c, a, b *Dense) error {
 		aCols := a.Columns()
@@ -322,15 +329,17 @@ func MulBlockFetchIJK(blockSize int) func(c, a, b *Dense) error {
 			for ac := 0; ac < aCols; ac += blockSize {
 				for bc := 0; bc < bCols; bc += blockSize {
 					for arb := ar; arb < ar+blockSize; arb++ {
+						dib := arb * bCols
+						aib := ar * aCols
 						for i := range row {
-							row[i] = a.At(ar, ac+i)
+							row[i] = a.data[aib+ac+i]
 						}
 						for bcb := bc; bcb < bc+blockSize; bcb++ {
 							var sum float64
 							for i, e := range row {
-								sum += e * b.At(ac+i, bcb)
+								sum += e * b.data[(ac+i)*bCols+bcb]
 							}
-							di := arb*bCols + bcb
+							di := dib + bcb
 							data[di] += sum
 						}
 					}
