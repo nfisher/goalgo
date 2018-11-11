@@ -312,6 +312,45 @@ func MulBlockIJK(blockSize int) func(c, a, b *Dense) error {
 	}
 }
 
+// MulBlockStrideIJK is lazily implemented if any of the dims aren't divisible by block size it defers to naive IJK.
+func MulBlockStrideIJK(blockSize int) func(c, a, b *Dense) error {
+	return func(c, a, b *Dense) error {
+		aCols := a.Columns()
+		aRows := a.Rows()
+		bCols := b.Columns()
+		var data = c.data
+
+		if aCols%blockSize != 0 || aRows%blockSize != 0 || bCols%blockSize != 0 {
+			return MulNaiveIJK(c, a, b)
+		}
+
+		for ar := 0; ar < aRows; ar += blockSize {
+			for ac := 0; ac < aCols; ac += blockSize {
+				for bc := 0; bc < bCols; bc += blockSize {
+					for arb := ar; arb < ar+blockSize; arb++ {
+						dib := arb * bCols
+						aib := arb * aCols
+						for acb := ac; acb < ac+blockSize; acb++ {
+							bib := acb * bCols
+							ai := aib + acb
+							s := a.data[ai]
+							for bcb := bc; bcb < bc+blockSize; bcb += 4 {
+								di := dib + bcb
+								bi := bib + bcb
+								data[di] += s * b.data[bi]
+								data[di+1] += s * b.data[bi+1]
+								data[di+2] += s * b.data[bi+2]
+								data[di+3] += s * b.data[bi+3]
+							}
+						}
+					}
+				}
+			}
+		}
+		return nil
+	}
+}
+
 // MulBlockIJK is lazily implemented if any of the dims aren't divisible by block size it defers to naive IJK.
 func MulBlockFetchIJK(blockSize int) func(c, a, b *Dense) error {
 	return func(c, a, b *Dense) error {
