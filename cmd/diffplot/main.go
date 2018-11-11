@@ -73,6 +73,7 @@ func main() {
 
 	p.Title.Text = "Relative performance vs " + base + "\n(-ve is better)"
 	p.Y.Label.Text = "% difference vs " + base
+	p.X.Label.Text = "matrix dimension"
 
 	w := vg.Points(8)
 
