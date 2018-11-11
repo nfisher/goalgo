@@ -275,77 +275,71 @@ func MulNaiveKJI(c, a, b *Dense) error {
 	return nil
 }
 
-func MulDaxpy(c, a, b *Dense) error {
-	return nil
-}
+func MulBlockIJK(blockSize int) func(c, a, b *Dense) error {
+	return func(c, a, b *Dense) error {
+		aCols := a.Columns()
+		aRows := a.Rows()
+		bCols := b.Columns()
+		var data = c.data
 
-func dgemm(da float64, a *Dense, b *Dense, c *Dense) {
-	/*
-		var tmp = make([]float64, a)
-		for i := 0; i < b.Columns(); i++ {
-			dgemv(da, a, 1)
+		if aCols%blockSize != 0 || aRows%blockSize != 0 || bCols%blockSize != 0 {
+			return MulNaiveIJK(c, a, b)
 		}
-	*/
-}
 
-func dgemv(da float64, x *Dense, incx int, dy []float64, incy int) {
-	cols := x.Columns()
-	for i := 0; i < x.Rows(); i++ {
-		xpos := i * incx
-		daxpy(da, x.data[xpos:xpos+cols], incx, dy, incy)
-	}
-}
-
-func daxpy(da float64, dx []float64, incx int, dy []float64, incy int) {
-	for i := 0; i < len(dx); i += incx {
-		yi := i * incy
-		dy[yi] = dy[yi] + da*dx[i]
-	}
-}
-
-/*
-func daxpy(n int, da float64, dx []float64, incx int, dy []float64, incy int) {
-	if incx == 1 && incy == 1 {
-		m := n % 4
-
-		if m != 0 {
-			for i := 0; i < m; i++ {
-				dy[i] = dy[i] + da*dx[i]
+		for ar := 0; ar < aRows; ar += blockSize {
+			for ac := 0; ac < aCols; ac += blockSize {
+				for bc := 0; bc < bCols; bc += blockSize {
+					for arb := ar; arb < ar+blockSize; arb++ {
+						for acb := ac; acb < ac+blockSize; acb++ {
+							ai := arb*aCols + acb
+							for bcb := bc; bcb < bc+blockSize; bcb++ {
+								di := arb*bCols + bcb
+								bi := acb*bCols + bcb
+								data[di] += a.data[ai] * b.data[bi]
+							}
+						}
+					}
+				}
 			}
 		}
-
-		if n < 4 {
-			return
-		}
-
-		mp1 := m + 1
-
-		for i := mp1; i < n; i += 4 {
-			dy[i] = dy[i] + da*dx[i]
-			dy[i+1] = dy[i+1] + da*dx[i+1]
-			dy[i+2] = dy[i+2] + da*dx[i+2]
-			dy[i+3] = dy[i+3] + da*dx[i+3]
-		}
-	} else {
-		ix := 0
-		iy := 0
-
-		if incx < 0 {
-			ix = (-n+1)*incx + 1
-		}
-
-		if incy < 0 {
-			iy = (-n+1)*incy + 1
-		}
-
-		for i := 0; i < n; i++ {
-			dy[iy] = dy[iy] + da*dx[ix]
-			ix = ix + incx
-			iy = iy + incy
-		}
+		return nil
 	}
 }
-*/
+
+func MulBlockFetchIJK(blockSize int) func(c, a, b *Dense) error {
+	return func(c, a, b *Dense) error {
+		aCols := a.Columns()
+		aRows := a.Rows()
+		bCols := b.Columns()
+		row := make([]float64, blockSize)
+		var data = c.data
+
+		if aCols%blockSize != 0 || aRows%blockSize != 0 || bCols%blockSize != 0 {
+			return MulNaiveIJK(c, a, b)
+		}
+
+		for ar := 0; ar < aRows; ar += blockSize {
+			for ac := 0; ac < aCols; ac += blockSize {
+				for bc := 0; bc < bCols; bc += blockSize {
+					for arb := ar; arb < ar+blockSize; arb++ {
+						for i := range row {
+							row[i] = a.At(ar, ac+i)
+						}
+						for bcb := bc; bcb < bc+blockSize; bcb++ {
+							var sum float64
+							for i, e := range row {
+								sum += e * b.At(ac+i, bcb)
+							}
+							di := arb*bCols + bcb
+							data[di] += sum
+						}
+					}
+				}
+			}
+		}
+		return nil
+	}
+}
 
 // MulStride uses unrolled loops to create the dot product of two matrices.
 func MulStride(c, a, b *Dense) error {

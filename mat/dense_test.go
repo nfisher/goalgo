@@ -15,7 +15,18 @@ var ff = []struct {
 	name    string
 	product func(c, a, b *mat.Dense) error
 }{
-	//	{"daxpy", mat.MulDaxpy},
+	{"block2 ijk", mat.MulBlockIJK(2)},
+	{"block4 ijk", mat.MulBlockIJK(4)},
+	{"block8 ijk", mat.MulBlockIJK(8)},
+	{"block16 ijk", mat.MulBlockIJK(16)},
+	{"block32 ijk", mat.MulBlockIJK(32)},
+	{"block64 ijk", mat.MulBlockIJK(64)},
+	{"blockfetch2 ijk", mat.MulBlockFetchIJK(2)},
+	{"blockfetch4 ijk", mat.MulBlockFetchIJK(4)},
+	{"blockfetch8 ijk", mat.MulBlockFetchIJK(8)},
+	{"blockfetch16 ijk", mat.MulBlockFetchIJK(16)},
+	{"blockfetch32 ijk", mat.MulBlockFetchIJK(32)},
+	{"blockfetch64 ijk", mat.MulBlockFetchIJK(64)},
 	{"gaxpy", mat.MulGaxpy},
 	{"mulprefetch", mat.MulMultiplePrefetch2},
 	{"gni prefetch", mat.MulGonumNaivePrefetch},
