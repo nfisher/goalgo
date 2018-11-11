@@ -18,9 +18,12 @@ func main() {
 	var filename string
 	var base string
 	var threshold float64
+	var height float64
+
 	flag.StringVar(&base, "base", "naive_IJK", "base performance comparison function")
 	flag.StringVar(&filename, "in", "results.csv", "input file")
 	flag.Float64Var(&threshold, "threshold", 200, "cut-off threshold to ignore algorithms worse than")
+	flag.Float64Var(&height, "height", 5.0, "height of the image, (width is calculated as 1.618h)")
 	flag.Parse()
 
 	r, err := os.Open(filename)
@@ -111,13 +114,14 @@ func main() {
 		p.Legend.Add(k, bars)
 		p.Legend.Top = false
 		p.Legend.Left = false
+		p.Legend.Padding = vg.Points(1)
 		i++
 	}
 	p.NominalX(groups...)
 
 	log.Printf("%v\n", groups)
 
-	err = p.Save(8*vg.Inch, 5*vg.Inch, "results.png")
+	err = p.Save(vg.Length(1.618*height)*vg.Inch, vg.Length(height)*vg.Inch, "results.png")
 	if err != nil {
 		log.Println(err)
 	}
