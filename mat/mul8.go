@@ -9,3 +9,5 @@ func QuadAxpy(c, b []float64, s float64, ci, bi int)
 func HexAxpy(c, b []float64, s float64, ci, bi int)
 
 func HexadecAxpy(c, b []float64, s float64, ci, bi int)
+
+func WideAxpy(c, b []float64, s float64, ci, bi int)

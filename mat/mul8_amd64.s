@@ -75,15 +75,16 @@ TEXT	·HexadecAxpy(SB), NOSPLIT, $72
         VMOVAPD         32(DI)(BX*8), Y3
         VMOVAPD         64(DI)(BX*8), Y5
         VMOVAPD         96(DI)(BX*8), Y7
-        VMOVAPD         (DX)(AX*8), Y2
-        VMOVAPD         32(DX)(AX*8), Y4
-        VMOVAPD         64(DX)(AX*8), Y6
-        VMOVAPD         96(DX)(AX*8), Y8
 
         VMULPD          Y0, Y1, Y1
         VMULPD          Y0, Y3, Y3
         VMULPD          Y0, Y5, Y5
         VMULPD          Y0, Y7, Y7
+
+        VMOVAPD         (DX)(AX*8), Y2
+        VMOVAPD         32(DX)(AX*8), Y4
+        VMOVAPD         64(DX)(AX*8), Y6
+        VMOVAPD         96(DX)(AX*8), Y8
 
         VADDPD          Y1, Y2, Y2
         VADDPD          Y3, Y4, Y4
@@ -94,5 +95,59 @@ TEXT	·HexadecAxpy(SB), NOSPLIT, $72
         VMOVAPD         Y4, 32(DX)(AX*8)
         VMOVAPD         Y6, 64(DX)(AX*8)
         VMOVAPD         Y8, 96(DX)(AX*8)
+
+        RET
+
+TEXT	·WideAxpy(SB), NOSPLIT, $72
+        MOVQ	        c+16(SP), DX // c ptr
+        MOVQ	        b+40(SP), DI // b ptr
+        VBROADCASTSD    s+64(SP), Y0 // s
+        MOVQ	        ci+72(SP), AX // ci
+        MOVQ	        bi+80(SP), BX // bi
+
+        VMOVAPD         (DI)(BX*8), Y1
+        VMOVAPD         32(DI)(BX*8), Y3
+        VMOVAPD         64(DI)(BX*8), Y5
+        VMOVAPD         96(DI)(BX*8), Y7
+        VMOVAPD         128(DI)(BX*8), Y9
+        VMOVAPD         160(DI)(BX*8), Y11
+        VMOVAPD         192(DI)(BX*8), Y13
+        VMOVAPD         224(DI)(BX*8), Y15
+
+        VMULPD          Y0, Y1, Y1
+        VMULPD          Y0, Y3, Y3
+        VMULPD          Y0, Y5, Y5
+        VMULPD          Y0, Y7, Y7
+        VMULPD          Y0, Y9, Y9
+        VMULPD          Y0, Y11, Y11
+        VMULPD          Y0, Y13, Y13
+        VMULPD          Y0, Y15, Y15
+
+        VMOVAPD         (DX)(AX*8), Y0
+        VMOVAPD         32(DX)(AX*8), Y2
+        VMOVAPD         64(DX)(AX*8), Y4
+        VMOVAPD         96(DX)(AX*8), Y6
+        VMOVAPD         128(DX)(AX*8), Y8
+        VMOVAPD         160(DX)(AX*8), Y10
+        VMOVAPD         192(DX)(AX*8), Y12
+        VMOVAPD         224(DX)(AX*8), Y14
+
+        VADDPD          Y1, Y0, Y0
+        VADDPD          Y3, Y2, Y2
+        VADDPD          Y5, Y4, Y4
+        VADDPD          Y7, Y6, Y6
+        VADDPD          Y9, Y8, Y8
+        VADDPD          Y11, Y10, Y10
+        VADDPD          Y13, Y12, Y12
+        VADDPD          Y15, Y14, Y14
+
+        VMOVAPD         Y0, (DX)(AX*8)
+        VMOVAPD         Y2, 32(DX)(AX*8)
+        VMOVAPD         Y4, 64(DX)(AX*8)
+        VMOVAPD         Y6, 96(DX)(AX*8)
+        VMOVAPD         Y8, 128(DX)(AX*8)
+        VMOVAPD         Y10, 160(DX)(AX*8)
+        VMOVAPD         Y12, 192(DX)(AX*8)
+        VMOVAPD         Y14, 224(DX)(AX*8)
 
         RET

@@ -199,7 +199,7 @@ func MulNaiveIJK(c, a, b *Dense) error {
 
 // MulSimdIJK is lazily implemented if any of the dims aren't divisible by block size it defers to naive IJK.
 func MulSimdIJK(c, a, b *Dense) error {
-	const blockSize = 16
+	const blockSize = 32
 	aCols := a.Columns()
 	aRows := a.Rows()
 	bCols := b.Columns()
@@ -223,7 +223,7 @@ func MulSimdIJK(c, a, b *Dense) error {
 						for bcb := bc; bcb < bc+blockSize; bcb += blockSize {
 							ci := cib + bcb
 							bi := bib + bcb
-							HexadecAxpy(cdata, bdata, s, ci, bi)
+							WideAxpy(cdata, bdata, s, ci, bi)
 							//AxpyLoop(cdata, bdata, s, bc, cib, bib, blockSize)
 						}
 					}
