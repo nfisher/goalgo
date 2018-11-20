@@ -55,8 +55,10 @@ TEXT	·HexAxpy(SB), NOSPLIT, $72
 
         VMULPD          Y0, Y1, Y1
         VMULPD          Y0, Y3, Y3
+
         VADDPD          Y1, Y2, Y2
         VADDPD          Y3, Y4, Y4
+
         VMOVAPD         Y2, (DX)(AX*8)
         VMOVAPD         Y4, 32(DX)(AX*8)
 
