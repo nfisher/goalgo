@@ -1,5 +1,7 @@
 package mat
 
-func Abs(v float64) float64
+// AxpyLoop loops around an axpy function.
+func AxpyLoop(c, b []float64, s float64, bc, cib, bib, blockSize int)
 
-//func Mul8(a, b [8]float64) [8]float64
+// QuadAxpy applies 4 axpy derivatives as vectorised operations.
+func QuadAxpy(c, b []float64, s float64, ci, bi int)

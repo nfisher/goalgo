@@ -12,8 +12,10 @@ func MulGaxpy(c, a, b *Dense) error {
 	for i := 0; i < aRows; i++ {
 		for k := 0; k < aCols; k++ {
 			s := a.data[i*aCols+k]
+			ib := i * bCols
+			kb := k * bCols
 			for j := 0; j < bCols; j++ {
-				data[i*bCols+j] += s * b.data[k*bCols+j]
+				data[ib+j] += s * b.data[kb+j]
 			}
 		}
 	}
@@ -62,7 +64,7 @@ func MulGonumNaive(c, a, b *Dense) error {
 	return nil
 }
 
-// MulMultiplePrefetch2 uses simple iteration to create the dot product of two matrices.
+// MulMultiplePrefetch2 uses simple iteration to create the product of two matrices.
 // Author: @james-bowman
 func MulMultiplePrefetch2(c, a, b *Dense) error {
 	aCols := a.Columns()
@@ -154,7 +156,7 @@ func MulGonumUnroll(c, a, b *Dense) error {
 	return nil
 }
 
-// MulNaive uses simple iteration to create the dot product of two matrices.
+// MulNaive uses simple iteration to create the product of two matrices.
 func MulNaiveIKJ(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
@@ -192,6 +194,43 @@ func MulNaiveIJK(c, a, b *Dense) error {
 		}
 	}
 
+	return nil
+}
+
+// MulSimdIJK is lazily implemented if any of the dims aren't divisible by block size it defers to naive IJK.
+func MulSimdIJK(c, a, b *Dense) error {
+	const blockSize = 4
+	aCols := a.Columns()
+	aRows := a.Rows()
+	bCols := b.Columns()
+	var cdata = c.data
+	var bdata = b.data
+
+	if aCols%blockSize != 0 || aRows%blockSize != 0 || bCols%blockSize != 0 {
+		return MulNaiveIJK(c, a, b)
+	}
+
+	for ar := 0; ar < aRows; ar += blockSize {
+		for ac := 0; ac < aCols; ac += blockSize {
+			for bc := 0; bc < bCols; bc += blockSize {
+				for arb := ar; arb < ar+blockSize; arb++ {
+					cib := arb * bCols
+					aib := arb * aCols
+					for acb := ac; acb < ac+blockSize; acb++ {
+						bib := acb * bCols
+						ai := aib + acb
+						s := a.data[ai]
+						for bcb := bc; bcb < bc+blockSize; bcb += blockSize {
+							ci := cib + bcb
+							bi := bib + bcb
+							QuadAxpy(cdata, bdata, s, ci, bi)
+							//AxpyLoop(cdata, bdata, s, bc, cib, bib, blockSize)
+						}
+					}
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -389,7 +428,7 @@ func MulBlockFetchIJK(blockSize int) func(c, a, b *Dense) error {
 	}
 }
 
-// MulUnroll uses unrolled loops to create the dot product of two matrices.
+// MulUnroll uses unrolled loops to create the product of two matrices.
 func MulUnroll(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
