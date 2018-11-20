@@ -40,3 +40,24 @@ TEXT	·QuadAxpy(SB), NOSPLIT, $72
         VMOVAPD         Y2, (DX)(AX*8)
 
         RET
+
+TEXT	·HexAxpy(SB), NOSPLIT, $72
+        MOVQ	        c+16(SP), DX // c ptr
+        MOVQ	        b+40(SP), DI // b ptr
+        VBROADCASTSD    s+64(SP), Y0 // s
+        MOVQ	        ci+72(SP), AX // ci
+        MOVQ	        bi+80(SP), BX // bi
+
+        VMOVAPD         (DI)(BX*8), Y1
+        VMOVAPD         32(DI)(BX*8), Y3
+        VMOVAPD         (DX)(AX*8), Y2
+        VMOVAPD         32(DX)(AX*8), Y4
+
+        VMULPD          Y0, Y1, Y1
+        VMULPD          Y0, Y3, Y3
+        VADDPD          Y1, Y2, Y2
+        VADDPD          Y3, Y4, Y4
+        VMOVAPD         Y2, (DX)(AX*8)
+        VMOVAPD         Y4, 32(DX)(AX*8)
+
+        RET
