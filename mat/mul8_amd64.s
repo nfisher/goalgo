@@ -105,13 +105,21 @@ TEXT	·WideAxpy(SB), NOSPLIT, $72
         MOVQ	        ci+72(SP), AX // ci
         MOVQ	        bi+80(SP), BX // bi
 
+        VMOVAPD         (DX)(AX*8), Y0
         VMOVAPD         (DI)(BX*8), Y1
+        VMOVAPD         32(DX)(AX*8), Y2
         VMOVAPD         32(DI)(BX*8), Y3
+        VMOVAPD         64(DX)(AX*8), Y4
         VMOVAPD         64(DI)(BX*8), Y5
+        VMOVAPD         96(DX)(AX*8), Y6
         VMOVAPD         96(DI)(BX*8), Y7
+        VMOVAPD         128(DX)(AX*8), Y8
         VMOVAPD         128(DI)(BX*8), Y9
+        VMOVAPD         160(DX)(AX*8), Y10
         VMOVAPD         160(DI)(BX*8), Y11
+        VMOVAPD         192(DX)(AX*8), Y12
         VMOVAPD         192(DI)(BX*8), Y13
+        VMOVAPD         224(DX)(AX*8), Y14
         VMOVAPD         224(DI)(BX*8), Y15
 
         VMULPD          Y0, Y1, Y1
@@ -122,15 +130,6 @@ TEXT	·WideAxpy(SB), NOSPLIT, $72
         VMULPD          Y0, Y11, Y11
         VMULPD          Y0, Y13, Y13
         VMULPD          Y0, Y15, Y15
-
-        VMOVAPD         (DX)(AX*8), Y0
-        VMOVAPD         32(DX)(AX*8), Y2
-        VMOVAPD         64(DX)(AX*8), Y4
-        VMOVAPD         96(DX)(AX*8), Y6
-        VMOVAPD         128(DX)(AX*8), Y8
-        VMOVAPD         160(DX)(AX*8), Y10
-        VMOVAPD         192(DX)(AX*8), Y12
-        VMOVAPD         224(DX)(AX*8), Y14
 
         VADDPD          Y1, Y0, Y0
         VADDPD          Y3, Y2, Y2

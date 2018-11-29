@@ -113,6 +113,7 @@ func MulMultiplePrefetch2(c, a, b *Dense) error {
 	return nil
 }
 
+// MulGonumUnroll multiplies a matrix using the gonum At interface with 8 wide unrolled loop.
 func MulGonumUnroll(c, a, b *Dense) error {
 	const stride = 8
 	aCols := a.Columns()

@@ -46,24 +46,25 @@ var ff = []struct {
 	product func(c, a, b *mat.Dense) error
 }{
 	{"simd ijk", mat.MulSimdIJK},
-	{"block2 ijk", mat.MulBlockIJK(2)},
-	{"block4 ijk", mat.MulBlockIJK(4)},
 	{"block8 ijk", mat.MulBlockIJK(8)},
 	{"block16 ijk", mat.MulBlockIJK(16)},
+	{"bunroll8 ijk", mat.MulBlockUnrollIJK(8)},
+	{"bunroll16 ijk", mat.MulBlockUnrollIJK(16)},
+	{"bunroll32 ijk", mat.MulBlockUnrollIJK(32)},
+	{"bunroll64 ijk", mat.MulBlockUnrollIJK(64)},
+	{"gaxpy", mat.MulGaxpy},
+	/* Commented out tests that benchmark over 1.5s
+	{"block2 ijk", mat.MulBlockIJK(2)},
+	{"block4 ijk", mat.MulBlockIJK(4)},
 	{"block32 ijk", mat.MulBlockIJK(32)},
 	{"block64 ijk", mat.MulBlockIJK(64)},
-	{"blockunroll4 ijk", mat.MulBlockUnrollIJK(4)},
-	{"blockunroll8 ijk", mat.MulBlockUnrollIJK(8)},
-	{"blockunroll16 ijk", mat.MulBlockUnrollIJK(16)},
-	{"blockunroll32 ijk", mat.MulBlockUnrollIJK(32)},
-	{"blockunroll64 ijk", mat.MulBlockUnrollIJK(64)},
+	{"bunroll4 ijk", mat.MulBlockUnrollIJK(4)},
 	{"blockfetch2 ijk", mat.MulBlockFetchIJK(2)},
 	{"blockfetch4 ijk", mat.MulBlockFetchIJK(4)},
 	{"blockfetch8 ijk", mat.MulBlockFetchIJK(8)},
 	{"blockfetch16 ijk", mat.MulBlockFetchIJK(16)},
 	{"blockfetch32 ijk", mat.MulBlockFetchIJK(32)},
 	{"blockfetch64 ijk", mat.MulBlockFetchIJK(64)},
-	{"gaxpy", mat.MulGaxpy},
 	{"mulprefetch", mat.MulMultiplePrefetch2},
 	{"gni prefetch", mat.MulGonumNaivePrefetch},
 	{"gni unroll", mat.MulGonumUnroll},
@@ -75,6 +76,7 @@ var ff = []struct {
 	{"naive JKI", mat.MulNaiveJKI},
 	{"naive KIJ", mat.MulNaiveKIJ},
 	{"naive KJI", mat.MulNaiveKJI},
+	*/
 }
 
 func Test_Product(t *testing.T) {
