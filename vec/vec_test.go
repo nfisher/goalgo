@@ -1,119 +1,45 @@
 package vec
 
 import (
-	"math"
 	"reflect"
 	"testing"
 )
 
-const defaultBranchingFactor = 32
+var Value int
 
-func Vec(values ...int) *Vector {
-	return buildTree(defaultBranchingFactor, values...)
-}
-
-func buildTree(branchingFactor int, values ...int) *Vector {
-	size := len(values)
-	leafCount := int(math.Ceil(float64(size) / float64(branchingFactor)))
-	leaves := make([][]interface{}, leafCount)
-
-	for i := range leaves {
-		leaves[i] = make([]interface{}, 0, branchingFactor)
+func Benchmark_Lookup(b *testing.B) {
+	td := []struct {
+		name string
+		fn func(*Vector, int) interface{}
+	}{
+		{"digit based", LookupDigit},
+		{"bit based", Lookup},
 	}
 
-	for i, v := range values {
-		n := i / branchingFactor
-		leaves[n] = append(leaves[n], v)
-	}
-
-	var root []interface{}
-	depth := 0
-	level := leaves
-	for {
-		if len(level) == 1 {
-			break
-		}
-		depth++
-
-		parentCount := int(math.Ceil(float64(len(level)) / float64(branchingFactor)))
-		parents := make([][]interface{}, parentCount)
-		for i := range parents {
-			parents[i] = make([]interface{}, branchingFactor)
-		}
-
-		for i, v := range level {
-			n := i / branchingFactor
-			c := i % branchingFactor
-			parents[n][c] = v
-		}
-		level = parents
-	}
-
-	root = level[0]
-
-	return &Vector{
-		branchingFactor: branchingFactor,
-		depth:           depth,
-		size:            size,
-		root:            root,
+	v := Vec(intValues...)
+	for _, tc := range td {
+		b.Run(tc.name, func(b *testing.B) {
+			var sum = 0
+			for i := 0; i < b.N; i++ {
+				value := tc.fn(v, 120)
+				sum += value.(int)
+			}
+			Value = sum
+		})
 	}
 }
 
-type Vector struct {
-	branchingFactor int
-	size            int
-	depth           int
-	root            []interface{}
-}
+func Test_Lookup(t *testing.T) {
+	v := Vec(intValues...)
 
-func (v *Vector) Count() int {
-	return v.size
-}
-
-func lookup(v *Vector, key int) interface{} {
-	var node []interface{} = v.root
-	var size int = int(math.Pow(float64(v.branchingFactor), float64(v.depth)))
-
-	for ; size > 1; size = size / v.branchingFactor {
-		node = node[(key/size)%v.branchingFactor].([]interface{})
+	actual, ok := Lookup(v, 11).(int)
+	if !ok {
+		t.Errorf("ok = %v, want true", ok)
 	}
 
-	return node[key%v.branchingFactor]
-}
-
-func update(v *Vector, key int, value interface{}) *Vector {
-	var newV Vector = *v
-	var node []interface{} = make([]interface{}, len(v.root), v.branchingFactor)
-	for i := range v.root {
-		node[i] = v.root[i]
+	if actual != 12 {
+		t.Errorf("Lookup2(v,12) = %v, want %v", actual, 12)
 	}
-	newV.root = node
-
-	var size int = int(math.Pow(float64(v.branchingFactor), float64(v.depth)))
-
-	for ; size > 1; size = size / v.branchingFactor {
-		parent := node
-		idx := (key / size) % v.branchingFactor
-		refNode := node[idx].([]interface{})
-		node = make([]interface{}, len(refNode), v.branchingFactor)
-		for i := range refNode {
-			node[i] = refNode[i]
-		}
-		parent[idx] = node
-	}
-
-	node[key%v.branchingFactor] = value
-	return &newV
-}
-
-func raw(vec *Vector) []int {
-	var vals = make([]int, 0, vec.size)
-	for i := 0; i < vec.size; i++ {
-		v := lookup(vec, i)
-		vals = append(vals, v.(int))
-	}
-
-	return vals
 }
 
 func Test_Update(t *testing.T) {
@@ -128,22 +54,22 @@ func Test_Update(t *testing.T) {
 
 	for _, tc := range td {
 		t.Run(tc.name, func(t *testing.T) {
-			vals := intValues[:7]
-			v := buildTree(4, vals...)
-			v2 := update(v, tc.index, tc.value)
+			values := intValues[:48]
+			v := BuildTree(4, values...)
+			v2 := Update(v, tc.index, tc.value)
 
 			if reflect.DeepEqual(v, v2) {
-				t.Errorf("update(v,3,4) = %v, should not equal %v", v2.root, v.root)
+				t.Errorf("Update(v,3,4) = %v, should not equal %v", v2.root, v.root)
 			}
 		})
 	}
 }
 
-func Test_Create(t *testing.T) {
+func Test_BuildTree(t *testing.T) {
 	td := []struct {
 		name   string
 		length int
-		depth  int
+		depth  uint
 	}{
 		{"single layer", 2, 0},
 		{"two layers", 5, 1},
@@ -154,14 +80,14 @@ func Test_Create(t *testing.T) {
 	for _, tc := range td {
 		t.Run(tc.name, func(t *testing.T) {
 			var vals = intValues[:tc.length]
-			v := buildTree(4, vals...)
+			v := BuildTree(4, vals...)
 
 			if v.Count() != tc.length {
 				t.Fatalf("v.Count() = %v, want %v", v.Count(), tc.length)
 			}
 
-			if v.depth != tc.depth {
-				t.Fatalf("v.depth = %v, want %v", v.depth, tc.depth)
+			if v.Depth() != tc.depth {
+				t.Fatalf("v.Depth() = %v, want %v", v.Depth(), tc.depth)
 			}
 
 			raw := raw(v)
@@ -170,6 +96,16 @@ func Test_Create(t *testing.T) {
 			}
 		})
 	}
+}
+
+func raw(vec *Vector) []int {
+	var values = make([]int, 0, vec.Count())
+	for i := 0; i < vec.Count(); i++ {
+		v := LookupDigit(vec, i)
+		values = append(values, v.(int))
+	}
+
+	return values
 }
 
 var intValues = []int{
