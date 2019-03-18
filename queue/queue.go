@@ -2,21 +2,6 @@ package queue
 
 import "errors"
 
-type Link struct {
-	Next  *Link
-	Value int
-}
-
-type Queue struct {
-	depth int
-	head  *Link
-	tail  *Link
-}
-
-func New() *Queue {
-	return &Queue{}
-}
-
 // Enqueue adds a value to the back of the queue.
 func (q *Queue) Enqueue(v int) {
 	newTail := &Link{
@@ -36,11 +21,6 @@ func (q *Queue) Enqueue(v int) {
 	q.tail = newTail
 }
 
-// Len returns the current depth of the queue.
-func (q *Queue) Len() int {
-	return q.depth
-}
-
 // Dequeue returns the value from the front of the queue, ErrNoValues if none present.
 func (q *Queue) Dequeue() (int, error) {
 	l := q.head
@@ -52,6 +32,27 @@ func (q *Queue) Dequeue() (int, error) {
 	q.head = l.Next
 
 	return l.Value, nil
+}
+
+// Len returns the current depth of the queue.
+func (q *Queue) Len() int {
+	return q.depth
+}
+
+// New creates a new empty queue.
+func New() *Queue {
+	return &Queue{}
+}
+
+type Queue struct {
+	depth int
+	head  *Link
+	tail  *Link
+}
+
+type Link struct {
+	Next  *Link
+	Value int
 }
 
 var ErrNoValues = errors.New("queue has no values enqueued")
