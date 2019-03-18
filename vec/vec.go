@@ -7,10 +7,10 @@ import (
 const defaultBranchingFactor = 32
 
 func Vec(values ...int) *Vector {
-	return BuildTree(defaultBranchingFactor, values...)
+	return buildTree(defaultBranchingFactor, values...)
 }
 
-func BuildTree(branchingFactor int, values ...int) *Vector {
+func buildTree(branchingFactor int, values ...int) *Vector {
 	size := len(values)
 	leafCount := int(math.Ceil(float64(size) / float64(branchingFactor)))
 	leaves := make([][]interface{}, leafCount)
@@ -72,54 +72,42 @@ func (v *Vector) Depth() uint {
 	return v.depth
 }
 
-const Bits uint = 5
-const Width int = 1 << Bits
-const Mask = Width - 1
+const bits uint = 5
+const width int = 1 << bits
+const mask = width - 1
 
-func Lookup(v *Vector, key int) interface{} {
+// Lookup retrieves the value in vector stored in position key.
+func Lookup(v *Vector, idx int) interface{} {
 	var node = v.root
-	var shift = Bits * v.depth
+	var shift = bits * v.depth
 
-	for level := shift; level > 0; level -= Bits {
-		node = node[(key >> uint(level)) & Mask].([]interface{})
+	for level := shift; level > 0; level -= bits {
+		node = node[(idx>>uint(level))&mask].([]interface{})
 	}
 
-	return node[key & Mask]
+	return node[idx&mask]
 }
 
-func LookupDigit(v *Vector, key int) interface{} {
+// Update modifies the value in the vector v at index idx.
+func Update(v *Vector, idx int, value interface{}) *Vector {
+	var newV = *v // copy value
 	var node = v.root
-	var size = int(math.Pow(float64(v.branchingFactor), float64(v.depth)))
+	var shift = bits * v.depth
 
-	for ; size > 1; size = size / v.branchingFactor {
-		node = node[(key/size)%v.branchingFactor].([]interface{})
+	newV.root = make([]interface{}, len(v.root), v.branchingFactor)
+	copy(newV.root, v.root)
+	var pNode = newV.root
+
+	for level := shift; level > 0; level -= bits {
+		pos := (idx>>uint(level))&mask
+		node = node[pos].([]interface{})
+		newNode := make([]interface{}, len(node), v.branchingFactor)
+		pNode[pos] = newNode
+		pNode = newNode
+		copy(newNode, node)
 	}
 
-	return node[key%v.branchingFactor]
-}
-
-func Update(v *Vector, key int, value interface{}) *Vector {
-	var newV = *v
-	var node = make([]interface{}, len(v.root), v.branchingFactor)
-	for i := range v.root {
-		node[i] = v.root[i]
-	}
-	newV.root = node
-
-	var size = int(math.Pow(float64(v.branchingFactor), float64(v.Depth())))
-
-	for ; size > 1; size = size / v.branchingFactor {
-		parent := node
-		idx := (key / size) % v.branchingFactor
-		refNode := node[idx].([]interface{})
-		node = make([]interface{}, len(refNode), v.branchingFactor)
-		for i := range refNode {
-			node[i] = refNode[i]
-		}
-		parent[idx] = node
-	}
-
-	node[key%v.branchingFactor] = value
+	pNode[idx&mask] = value
 	return &newV
 }
 

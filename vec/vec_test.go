@@ -1,33 +1,13 @@
 package vec
 
 import (
+	"math"
 	"reflect"
 	"testing"
 )
 
 var Value int
-
-func Benchmark_Lookup(b *testing.B) {
-	td := []struct {
-		name string
-		fn func(*Vector, int) interface{}
-	}{
-		{"digit based", LookupDigit},
-		{"bit based", Lookup},
-	}
-
-	v := Vec(intValues...)
-	for _, tc := range td {
-		b.Run(tc.name, func(b *testing.B) {
-			var sum = 0
-			for i := 0; i < b.N; i++ {
-				value := tc.fn(v, 120)
-				sum += value.(int)
-			}
-			Value = sum
-		})
-	}
-}
+var VecValue *Vector
 
 func Test_Lookup(t *testing.T) {
 	v := Vec(intValues...)
@@ -38,28 +18,53 @@ func Test_Lookup(t *testing.T) {
 	}
 
 	if actual != 12 {
-		t.Errorf("Lookup2(v,12) = %v, want %v", actual, 12)
+		t.Errorf("Lookup2(v,11) = %v, want %v", actual, 12)
 	}
 }
 
 func Test_Update(t *testing.T) {
+	v := Vec(intValues...)
+	v2 := Update(v, 10, 8)
+
+	if Lookup(v, 10) != 11 {
+		t.Errorf("Lookup(v, %v) = %v, want %v", 10, Lookup(v, 10), 11)
+	}
+
+	if Lookup(v2, 10) != 8 {
+		t.Errorf("Lookup(v2, %v) = %v, want %v", 10, Lookup(v2, 10), 8)
+	}
+
+	if Lookup(v2, 0) != 1 {
+		t.Errorf("Lookup(v2, %v) = %v, want %v", 0, Lookup(v2, 0), 1)
+	}
+
+	if Lookup(v2, 127) != 128 {
+		t.Errorf("Lookup(v2, %v) = %v, want %v", 127, Lookup(v2, 127), 128)
+	}
+}
+
+func Test_UpdateDigit(t *testing.T) {
 	td := []struct {
 		name  string
 		index int
 		value int
 	}{
-		{"first element", 0, 4},
-		{"fifth element", 4, 4},
+		{"first element", 0, 2},
+		{"fifth element", 4, 6 },
 	}
 
 	for _, tc := range td {
 		t.Run(tc.name, func(t *testing.T) {
 			values := intValues[:48]
-			v := BuildTree(4, values...)
-			v2 := Update(v, tc.index, tc.value)
+			v := buildTree(4, values...)
+			v2 := update(v, tc.index, tc.value)
 
 			if reflect.DeepEqual(v, v2) {
-				t.Errorf("Update(v,3,4) = %v, should not equal %v", v2.root, v.root)
+				t.Errorf("update(v,%v,%v) = %v, should not equal %v", tc.index, tc.value, v2.root, v.root)
+			}
+
+			if lookup(v2, tc.index) != tc.value {
+				t.Errorf("lookup(v, %v) = %v, want %v", tc.index, lookup(v2, tc.index).(int), tc.value)
 			}
 		})
 	}
@@ -80,7 +85,7 @@ func Test_BuildTree(t *testing.T) {
 	for _, tc := range td {
 		t.Run(tc.name, func(t *testing.T) {
 			var vals = intValues[:tc.length]
-			v := BuildTree(4, vals...)
+			v := buildTree(4, vals...)
 
 			if v.Count() != tc.length {
 				t.Fatalf("v.Count() = %v, want %v", v.Count(), tc.length)
@@ -101,7 +106,7 @@ func Test_BuildTree(t *testing.T) {
 func raw(vec *Vector) []int {
 	var values = make([]int, 0, vec.Count())
 	for i := 0; i < vec.Count(); i++ {
-		v := LookupDigit(vec, i)
+		v := lookup(vec, i)
 		values = append(values, v.(int))
 	}
 
@@ -115,4 +120,38 @@ var intValues = []int{
 	73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96,
 	97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120,
 	121, 122, 123, 124, 125, 126, 127, 128, 129,
+}
+
+// Digit based update for testing purposes.
+func update(v *Vector, key int, value interface{}) *Vector {
+	var newV = *v
+	var node = make([]interface{}, len(v.root), v.branchingFactor)
+	copy(node, v.root)
+	newV.root = node
+
+	var size = int(math.Pow(float64(v.branchingFactor), float64(v.Depth())))
+
+	for ; size > 1; size = size / v.branchingFactor {
+		parent := node
+		idx := (key / size) % v.branchingFactor
+		refNode := node[idx].([]interface{})
+		node = make([]interface{}, len(refNode), v.branchingFactor)
+		copy(node, refNode)
+		parent[idx] = node
+	}
+
+	node[key%v.branchingFactor] = value
+	return &newV
+}
+
+// Digit based lookup for testing purposes.
+func lookup(v *Vector, key int) interface{} {
+	var node = v.root
+	var size = int(math.Pow(float64(v.branchingFactor), float64(v.depth)))
+
+	for ; size > 1; size = size / v.branchingFactor {
+		node = node[(key/size)%v.branchingFactor].([]interface{})
+	}
+
+	return node[key%v.branchingFactor]
 }
