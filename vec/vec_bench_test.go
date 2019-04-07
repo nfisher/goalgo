@@ -44,4 +44,3 @@ func Benchmark_Lookup(b *testing.B) {
 		})
 	}
 }
-

@@ -115,25 +115,20 @@ func Test_basic_insert(t *testing.T) {
 func Test_min_max(t *testing.T) {
 	root, scope := gen()
 
-	max, _ := Max(root)
-	if scope.max != max.Value {
-		t.Errorf("max = %v, want %v", max, scope.max)
-	}
+	max, err := Max(root)
+	ok(t, err)
+	equals(t, scope.max, max.Value)
 
-	min, _ := Min(root)
-	if scope.min != min.Value {
-		t.Errorf("min = %v, want %v", min, scope.min)
-	}
+	min, err := Min(root)
+	ok(t, err)
+	equals(t, scope.min, min.Value)
 
 	single := &BinaryTree{Value: 7}
 	s, err := Min(single)
-	if err != nil {
-		t.Errorf("min err = %v, want nil", err)
-	}
+	ok(t, err)
 
-	if s == nil || s.Value != 7 {
-		t.Errorf("s = %#v, want 7", s)
-	}
+	assert(t, s != nil, "min value should not be nil")
+	equals(t, 7, s.Value)
 }
 
 func Test_search(t *testing.T) {
@@ -143,17 +138,10 @@ func Test_search(t *testing.T) {
 
 	for _, v := range scope.values {
 		n, err := Search(root, v)
-		if err != nil {
-			t.Fatalf("err = %v, want nil", err)
-		}
 
-		if n == nil {
-			t.Fatalf("n = nil, want node{%v}", v)
-		}
-
-		if n.Value != v {
-			t.Fatalf("n = %v, want %v", n.Value, v)
-		}
+		ok(t, err)
+		assert(t, n !=nil, "n = nil, want node{%v}", v)
+		equals(t, v, n.Value)
 	}
 
 	absent := scope.values[0]
@@ -164,25 +152,16 @@ func Test_search(t *testing.T) {
 	}
 
 	n, err := Search(root, absent)
-	if err != ErrNotFound {
-		t.Fatalf("err = %v, want ErrNotFound", err)
-	}
-
-	if n != nil {
-		t.Fatalf("n = %v, want nil", n)
-	}
+	equals(t, ErrNotFound, err)
+	assert(t, n == nil, "n = %v, want nil", n)
 }
 
 func Test_nil_check(t *testing.T) {
 	_, err := Max(nil)
-	if err != ErrNilTree {
-		t.Errorf("max err = %v, want %v", err, ErrNilTree)
-	}
+	equals(t, ErrNilTree, err)
 
 	_, err = Min(nil)
-	if err != ErrNilTree {
-		t.Errorf("min err = %v, want %v", err, ErrNilTree)
-	}
+	equals(t, ErrNilTree, err)
 }
 
 func PrintTree(tree *BinaryTree, pad string) {
@@ -223,13 +202,8 @@ func Test_delete(t *testing.T) {
 			}
 
 			n, err := Delete(root, tc.value)
-			if err != tc.err {
-				t.Fatalf("err = %v, want %v", err, tc.err)
-			}
-
-			if (n != nil) == tc.isNil {
-				t.Fatalf("n = %v, want %v", n, tc.isNil)
-			}
+			equals(t, tc.err, err)
+			assert(t, (n == nil) == tc.isNil, "n = %v, want %v", n, tc.isNil)
 
 			if n != nil && n.Parent != nil {
 				t.Fatalf("parent = %v, want nil", n.Parent)

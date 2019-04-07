@@ -99,7 +99,7 @@ func Update(v *Vector, idx int, value interface{}) *Vector {
 	var pNode = newV.root
 
 	for level := shift; level > 0; level -= bits {
-		pos := (idx>>uint(level))&mask
+		pos := (idx >> uint(level)) & mask
 		node = node[pos].([]interface{})
 		newNode := make([]interface{}, len(node), v.branchingFactor)
 		pNode[pos] = newNode
@@ -110,4 +110,3 @@ func Update(v *Vector, idx int, value interface{}) *Vector {
 	pNode[idx&mask] = value
 	return &newV
 }
-

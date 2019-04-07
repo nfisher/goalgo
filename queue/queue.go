@@ -3,7 +3,7 @@ package queue
 import "errors"
 
 // Enqueue adds a value to the back of the queue.
-func (q *Queue) Enqueue(v int) {
+func (q *Queue) Enqueue(v interface{}) {
 	newTail := &Link{
 		Value: v,
 	}
@@ -22,7 +22,7 @@ func (q *Queue) Enqueue(v int) {
 }
 
 // Dequeue returns the value from the front of the queue, ErrNoValues if none present.
-func (q *Queue) Dequeue() (int, error) {
+func (q *Queue) Dequeue() (interface{}, error) {
 	l := q.head
 	if l == nil {
 		return 0, ErrNoValues
@@ -52,8 +52,7 @@ type Queue struct {
 
 type Link struct {
 	Next  *Link
-	Value int
+	Value interface{}
 }
 
 var ErrNoValues = errors.New("queue has no values enqueued")
-

@@ -50,7 +50,7 @@ func Test_UpdateDigit(t *testing.T) {
 		value int
 	}{
 		{"first element", 0, 2},
-		{"fifth element", 4, 6 },
+		{"fifth element", 4, 6},
 	}
 
 	for _, tc := range td {
