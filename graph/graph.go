@@ -10,10 +10,12 @@ func Directed() *adjacency.List {
 	return &adjacency.List{}
 }
 
+
 // Graph interface for various forms of graphs.
 type Graph interface {
 	Edge(v, w int) error
 	Adjacent(v int) ([]int, error)
+	Vertex(out ...int) (int, error)
 	Vertices() int
 	Edges() int
 }
@@ -38,12 +40,55 @@ func Max(g Graph) int {
 	return max
 }
 
-// Degree returns the number of edges connected to the vertex.
-func Degree(g Graph, v int) (int, error) {
+// OutDegree returns the number of edges connected from the vertex.
+func OutDegree(g Graph, v int) (int, error) {
 	adj, err := g.Adjacent(v)
 	if err != nil {
 		return -1, err
 	}
 
 	return len(adj), nil
+}
+
+// Modifier is a graph initialisation modifier.
+type Modifier func(Graph)
+
+// Vertices initialises n vertices in the graph.
+func Vertices(n int) Modifier {
+	return func(g Graph) {
+		for i := 0; i < n; i++ {
+			g.Vertex()
+		}
+	}
+}
+
+// New builds a graph using the optional modifiers.
+func New(mm ...Modifier) Graph {
+	g := &adjacency.List{}
+	for _, m := range mm {
+		m(g)
+	}
+	return g
+}
+
+// Upward builds
+func Upward(m map[int][]int) Modifier {
+	return func(g Graph) {
+		for v := range m {
+			for _, w := range m[v] {
+				g.Edge(v, w)
+			}
+		}
+	}
+}
+
+// Downward builds a downward graph in the reverse specified.
+func Downward(m map[int][]int) Modifier {
+	return func(g Graph) {
+		for v := range m {
+			for _, w := range m[v] {
+				g.Edge(w, v)
+			}
+		}
+	}
 }

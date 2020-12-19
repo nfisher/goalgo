@@ -14,12 +14,12 @@ import (
 func Test_average_degree(t *testing.T) {
 	td := []struct {
 		name    string
-		list    *adjacency.List
+		list    graph.Graph
 		average float64
 		err     error
 	}{
-		{"no vertices", newList(), -1.0, errors.ErrNoVertices},
-		{"with connections", newList(WithEdges(), WithEdges(), WithEdges(), AddEdge(1, 0), AddEdge(1, 2)), 2.0 / 3.0 * 2.0, nil},
+		{"no vertices", graph.New(), -1.0, errors.ErrNoVertices},
+		{"with connections", graph.New( graph.Vertices(3), graph.Upward(map[int][]int{ 1: {0, 2} })), 2.0 / 3.0 * 2.0, nil},
 	}
 
 	for _, tc := range td {
@@ -39,11 +39,11 @@ func Test_average_degree(t *testing.T) {
 func Test_max_degree(t *testing.T) {
 	td := []struct {
 		name string
-		list *adjacency.List
+		list graph.Graph
 		max  int
 	}{
-		{"no connections", newList(WithEdges()), 0},
-		{"with connections", newList(WithEdges(), WithEdges(), WithEdges(), AddEdge(1, 0), AddEdge(1, 2)), 2},
+		{"no connections", graph.New(graph.Vertices(1)), 0},
+		{"with connections", graph.New(graph.Vertices(3), graph.Upward(map[int][]int{1: {0, 2}})), 2},
 	}
 
 	for _, tc := range td {
@@ -59,24 +59,24 @@ func Test_max_degree(t *testing.T) {
 func Test_degree(t *testing.T) {
 	td := []struct {
 		name   string
-		list   *adjacency.List
+		list   graph.Graph
 		vertex int
 		degree int
 		err    error
 	}{
-		{"no connections", newList(WithEdges()), 0, 0, nil},
-		{"with outbound connections", newList(WithEdges(), WithEdges(), WithEdges(), AddEdge(1, 0), AddEdge(1, 2)), 1, 2, nil},
-		{"out of range", newList(), 0, -1, errors.ErrVertexNotFound},
+		{"no connections", graph.New(graph.Vertices(1)), 0, 0, nil},
+		{"with outbound connections", graph.New(graph.Vertices(3), graph.Upward(map[int][]int{1: {0, 2}})), 1, 2, nil},
+		{"out of range", graph.New(), 0, -1, errors.ErrVertexNotFound},
 	}
 
 	for _, tc := range td {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := graph.Degree(tc.list, tc.vertex)
+			actual, err := graph.OutDegree(tc.list, tc.vertex)
 			if actual != tc.degree {
-				t.Errorf("Degree(%v) = %v, want %v", tc.vertex, actual, tc.degree)
+				t.Errorf("OutDegree(%v) = %v, want %v", tc.vertex, actual, tc.degree)
 			}
 			if err != tc.err {
-				t.Errorf("Degree(%v) err = %v, want %v", tc.vertex, err, tc.err)
+				t.Errorf("OutDegree(%v) err = %v, want %v", tc.vertex, err, tc.err)
 			}
 		})
 	}
@@ -85,14 +85,14 @@ func Test_degree(t *testing.T) {
 func Test_adjacent(t *testing.T) {
 	td := []struct {
 		name     string
-		list     *adjacency.List
+		list     graph.Graph
 		vertex   int
 		expected []int
 		err      error
 	}{
-		{"no vertices", newList(WithEdges(), WithEdges()), 1, nil, nil},
-		{"return adjacent vertices", newList(WithEdges(), WithEdges(0)), 1, []int{0}, nil},
-		{"error on invalid vertex", newList(), 0, nil, errors.ErrVertexNotFound},
+		{"no adjacent vertices", graph.New(graph.Vertices(2)), 1, nil, nil},
+		{"return adjacent vertices", graph.New(graph.Vertices(2), graph.Upward(map[int][]int{1: {0}})), 1, []int{0}, nil},
+		{"error on invalid vertex", graph.New(), 0, nil, errors.ErrVertexNotFound},
 	}
 
 	for _, tc := range td {
@@ -111,17 +111,16 @@ func Test_adjacent(t *testing.T) {
 func Test_edge(t *testing.T) {
 	td := []struct {
 		name string
-		list *adjacency.List
+		list graph.Graph
 		v    int
 		w    int
 		len  int
 		err  error
 	}{
-		{"add edge with valid vertices", newList(WithEdges(), WithEdges()), 0, 1, 1, nil},
-		{"add edge with valid vertices", newList(WithEdges(), WithEdges()), 0, 1, 1, nil},
-		{"rejects edge with invalid vertices", newList(), 0, 1, 0, errors.ErrCannotAddEdge},
-		{"rejects edge with invalid v vertices", newList(WithEdges()), 1, 0, 0, errors.ErrCannotAddEdge},
-		{"rejects edge with invalid w vertice", newList(WithEdges()), 0, 1, 0, errors.ErrCannotAddEdge},
+		{"add edge with valid vertices", graph.New(graph.Vertices(2)), 0, 1, 1, nil},
+		{"rejects edge with invalid vertices", graph.New(), 0, 1, 0, errors.ErrCannotAddEdge},
+		{"rejects edge with invalid v vertices", graph.New(graph.Vertices(1)), 1, 0, 0, errors.ErrCannotAddEdge},
+		{"rejects edge with invalid w vertice", graph.New(graph.Vertices(1)), 0, 1, 0, errors.ErrCannotAddEdge},
 	}
 
 	for _, tc := range td {
@@ -141,15 +140,15 @@ func Test_edge(t *testing.T) {
 func Test_vertices(t *testing.T) {
 	td := []struct {
 		name  string
-		list  *adjacency.List
+		list  graph.Graph
 		edges []int
 		id    int
 		err   error
 	}{
-		{"adds vertex to empty list", newList(), nil, 0, nil},
-		{"adds vertex to populated list", newList(WithEdges()), nil, 1, nil},
-		{"adds vertex with valid edge", newList(WithEdges()), []int{0}, 1, nil},
-		{"rejects vertex with invalid edge", newList(), []int{1}, -1, errors.ErrCannotAddVertices},
+		{"adds vertex to empty list", graph.New(), nil, 0, nil},
+		{"adds vertex to populated list", graph.New(graph.Vertices(1)), nil, 1, nil},
+		{"adds vertex with valid edge", graph.New(graph.Vertices(1)), []int{0}, 1, nil},
+		{"rejects vertex with invalid edge", graph.New(), []int{1}, -1, errors.ErrCannotAddVertices},
 	}
 
 	for _, tc := range td {
@@ -171,11 +170,11 @@ func Test_counters(t *testing.T) {
 		actual   int
 		expected int
 	}{
-		{"Vertices() for empty list", newList().Vertices(), 0},
-		{"Vertices() for populated list", newList(WithEdges(), WithEdges(0)).Vertices(), 2},
-		{"Edges() for empty list", newList().Edges(), 0},
-		{"Edges() for populated list", newList(WithEdges()).Edges(), 0},
-		{"Edges() for populated list with edge", newList(WithEdges(), WithEdges(0), WithEdges(0, 1)).Edges(), 3},
+		{"Vertices() for empty list", graph.New().Vertices(), 0},
+		{"Vertices() for populated list", graph.New(graph.Vertices(2), graph.Upward(map[int][]int{1: {0}})).Vertices(), 2},
+		{"Edges() for empty list", graph.New().Edges(), 0},
+		{"Edges() for populated list", graph.New(graph.Vertices(1)).Edges(), 0},
+		{"Edges() for populated list with edge", graph.New(graph.Vertices(3), graph.Upward(map[int][]int{1: {0}, 2:{0,1}})).Edges(), 3},
 	}
 
 	for _, tc := range td {
@@ -189,7 +188,8 @@ func Test_counters(t *testing.T) {
 
 func Test_EncodeJSON(t *testing.T) {
 	var buf bytes.Buffer
-	l := newList(WithEdges(), WithEdges(0), WithEdges(1), WithEdges(2), AddEdge(1, 3))
+	l := graph.New(graph.Vertices(4), graph.Upward(map[int][]int{1: {0,3}, 2:{1}, 3:{2}}))
+
 	enc := json.NewEncoder(&buf)
 	err := enc.Encode(&l)
 	if err != nil {
@@ -222,30 +222,3 @@ func Test_DecodeJSON(t *testing.T) {
 	}
 }
 
-type Modifier func(*adjacency.List)
-
-func WithEdges(i ...int) Modifier {
-	return func(as *adjacency.List) {
-		_, err := as.Vertex(i...)
-		if err != nil {
-			panic(err)
-		}
-	}
-}
-
-func AddEdge(v, w int) Modifier {
-	return func(as *adjacency.List) {
-		err := as.Edge(v, w)
-		if err != nil {
-			panic(err)
-		}
-	}
-}
-
-func newList(mm ...Modifier) *adjacency.List {
-	s := &adjacency.List{}
-	for _, m := range mm {
-		m(s)
-	}
-	return s
-}

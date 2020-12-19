@@ -53,7 +53,7 @@ func (as *List) Adjacent(v int) ([]int, error) {
 	}
 
 	var a []int
-	for k := range as.list[v] {
+	for _, k := range as.list[v] {
 		a = append(a, k)
 	}
 
