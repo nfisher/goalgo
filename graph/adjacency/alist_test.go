@@ -138,7 +138,7 @@ func Test_edge(t *testing.T) {
 	}
 }
 
-func Test_vertice(t *testing.T) {
+func Test_vertices(t *testing.T) {
 	td := []struct {
 		name  string
 		list  *adjacency.List
@@ -146,10 +146,10 @@ func Test_vertice(t *testing.T) {
 		id    int
 		err   error
 	}{
-		{"adds vertice to empty list", newList(), nil, 0, nil},
-		{"adds vertice to populated list", newList(WithEdges()), nil, 1, nil},
-		{"adds vertice with valid edge", newList(WithEdges()), []int{0}, 1, nil},
-		{"rejects vertice with invalid edge", newList(), []int{1}, -1, errors.ErrCannotAddVertices},
+		{"adds vertex to empty list", newList(), nil, 0, nil},
+		{"adds vertex to populated list", newList(WithEdges()), nil, 1, nil},
+		{"adds vertex with valid edge", newList(WithEdges()), []int{0}, 1, nil},
+		{"rejects vertex with invalid edge", newList(), []int{1}, -1, errors.ErrCannotAddVertices},
 	}
 
 	for _, tc := range td {

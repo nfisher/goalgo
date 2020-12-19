@@ -4,17 +4,15 @@ COVERAGE_PROFILE := results/coverage.out
 COVERAGE_HTML := results/coverage.html
 
 .PHONY: all
-all: install benchmark
+all: build benchmark
+
+.PHONY: build
+build: test vet
+	go build -v ./...
 
 .PHONY: install
 install: get test vet
 	go install -v ./...
-
-.PHONY: get
-get:
-	go get -d -u gonum.org/v1/gonum/mat
-	go get -d -u gonum.org/v1/gonum/blas/blas64
-	go get -d -u gonum.org/v1/plot
 
 .PHONY: test
 test: $(COVERAGE_PROFILE)

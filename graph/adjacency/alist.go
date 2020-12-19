@@ -14,17 +14,17 @@ type List struct {
 
 // Vertex adds a new vertex, optionally with the specified edges.
 func (as *List) Vertex(edges ...int) (id int, err error) {
-	var edgeset = []int{}
+	var edgeSet = make([]int, 0, len(edges))
 	l := len(as.list)
-	for _, i := range edges {
-		if i >= l {
+	for _, edge := range edges {
+		if edge >= l {
 			return -1, errors.ErrCannotAddVertices
 		}
-		edgeset = append(edgeset, i)
+		edgeSet = append(edgeSet, edge)
 	}
 
-	as.edges += len(edgeset)
-	as.list = append(as.list, edgeset)
+	as.edges += len(edgeSet)
+	as.list = append(as.list, edgeSet)
 
 	return l, nil
 }
