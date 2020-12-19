@@ -9,7 +9,7 @@ import (
 type SearchFn func(tree *BinaryTree, depth int) bool
 
 type nodeLevel struct {
-	tree *BinaryTree
+	tree  *BinaryTree
 	depth int
 }
 

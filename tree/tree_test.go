@@ -140,7 +140,7 @@ func Test_search(t *testing.T) {
 		n, err := Search(root, v)
 
 		ok(t, err)
-		assert(t, n !=nil, "n = nil, want node{%v}", v)
+		assert(t, n != nil, "n = nil, want node{%v}", v)
 		equals(t, v, n.Value)
 	}
 
