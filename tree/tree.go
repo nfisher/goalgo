@@ -133,7 +133,7 @@ func Delete(t *BinaryTree, v int) (*BinaryTree, error) {
 
 var (
 	// ErrNilTree is returned when a provided tree argument is nil.
-	ErrNilTree  = errors.New("nil tree invalid")
+	ErrNilTree = errors.New("nil tree invalid")
 	// ErrNotFound is returned when a value is not present in the tree.
 	ErrNotFound = errors.New("value not found in tree")
 )
