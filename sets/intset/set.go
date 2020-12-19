@@ -22,6 +22,7 @@ func (s *Set) Contains(i int) bool {
 	return (*s)[i]
 }
 
+// Remove removes the given value from the set.
 func (s *Set) Remove(i int) {
-	delete((*s), i)
+	delete(*s, i)
 }

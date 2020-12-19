@@ -6,6 +6,7 @@ import (
 
 const defaultBranchingFactor = 32
 
+// Vec builds an immutable vector using a COW tree.
 func Vec(values ...int) *Vector {
 	return buildTree(defaultBranchingFactor, values...)
 }
@@ -57,6 +58,7 @@ func buildTree(branchingFactor int, values ...int) *Vector {
 	}
 }
 
+// Vector is the root structure of an immutable vector.
 type Vector struct {
 	branchingFactor int
 	size            int
@@ -64,10 +66,12 @@ type Vector struct {
 	root            []interface{}
 }
 
+// Count returns the number of entries in the vector.
 func (v *Vector) Count() int {
 	return v.size
 }
 
+// Depth returns the tree depth of the vector.
 func (v *Vector) Depth() uint {
 	return v.depth
 }

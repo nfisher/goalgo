@@ -22,6 +22,7 @@ func MulGaxpy(c, a, b *Dense) error {
 	return nil
 }
 
+// MulGonumNaivePrefetch multiples dense matrices.
 // Author: @james-bowman
 func MulGonumNaivePrefetch(c, a, b *Dense) error {
 	aCols := a.Columns()
@@ -46,6 +47,7 @@ func MulGonumNaivePrefetch(c, a, b *Dense) error {
 	return nil
 }
 
+// MulGonumNaive multiples matrices.
 func MulGonumNaive(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
@@ -157,7 +159,7 @@ func MulGonumUnroll(c, a, b *Dense) error {
 	return nil
 }
 
-// MulNaive uses simple iteration to create the product of two matrices.
+// MulNaiveIKJ uses simple iteration to create the product of two matrices.
 func MulNaiveIKJ(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
@@ -178,6 +180,7 @@ func MulNaiveIKJ(c, a, b *Dense) error {
 	return nil
 }
 
+// MulNaiveIJK multiplies matrices.
 func MulNaiveIJK(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
@@ -235,6 +238,7 @@ func MulSimdIJK(c, a, b *Dense) error {
 	return nil
 }
 
+// MulNaiveKIJ multiplies matrices.
 func MulNaiveKIJ(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
@@ -255,6 +259,7 @@ func MulNaiveKIJ(c, a, b *Dense) error {
 	return nil
 }
 
+// MulNaiveJIK multiplies matrices.
 func MulNaiveJIK(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
@@ -275,6 +280,7 @@ func MulNaiveJIK(c, a, b *Dense) error {
 	return nil
 }
 
+// MulNaiveJKI multiplies matrices.
 func MulNaiveJKI(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
@@ -295,6 +301,7 @@ func MulNaiveJKI(c, a, b *Dense) error {
 	return nil
 }
 
+// MulNaiveKJI multiplies matrices.
 func MulNaiveKJI(c, a, b *Dense) error {
 	aCols := a.Columns()
 	aRows := a.Rows()
@@ -391,7 +398,7 @@ func MulBlockUnrollIJK(blockSize int) func(c, a, b *Dense) error {
 	}
 }
 
-// MulBlockIJK is lazily implemented if any of the dims aren't divisible by block size it defers to naive IJK.
+// MulBlockFetchIJK is lazily implemented if any of the dims aren't divisible by block size it defers to naive IJK.
 func MulBlockFetchIJK(blockSize int) func(c, a, b *Dense) error {
 	return func(c, a, b *Dense) error {
 		aCols := a.Columns()

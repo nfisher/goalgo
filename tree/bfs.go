@@ -13,6 +13,7 @@ type nodeLevel struct {
 	depth int
 }
 
+// BFSPrint prints all nodes in a tree using breadth-first search.
 func BFSPrint(tree *BinaryTree) {
 	var level int
 	q := queue.New()

@@ -44,15 +44,18 @@ func New() *Queue {
 	return &Queue{}
 }
 
+// Queue is a singly linked list based queue.
 type Queue struct {
 	depth int
 	head  *Link
 	tail  *Link
 }
 
+// Link is a single entry in the Queue.
 type Link struct {
 	Next  *Link
 	Value interface{}
 }
 
+// ErrNoValues is an error that is emitted when a queue has no values to dequeue.
 var ErrNoValues = errors.New("queue has no values enqueued")

@@ -2,6 +2,7 @@ package tree
 
 import "errors"
 
+// BinaryTree is the base structure for creating a binary tree.
 type BinaryTree struct {
 	Value  int
 	Left   *BinaryTree
@@ -9,6 +10,7 @@ type BinaryTree struct {
 	Parent *BinaryTree
 }
 
+// Insert adds a value to the tree.
 func Insert(t *BinaryTree, v int) *BinaryTree {
 	if t == nil {
 		return &BinaryTree{Value: v}
@@ -25,6 +27,7 @@ func Insert(t *BinaryTree, v int) *BinaryTree {
 	return t
 }
 
+// Max returns the maximum value in the tree.
 func Max(t *BinaryTree) (*BinaryTree, error) {
 	if t == nil {
 		return nil, ErrNilTree
@@ -36,6 +39,7 @@ func Max(t *BinaryTree) (*BinaryTree, error) {
 	return t, nil
 }
 
+// Min returns the minimum value in the tree.
 func Min(t *BinaryTree) (*BinaryTree, error) {
 	if t == nil {
 		return nil, ErrNilTree
@@ -47,6 +51,7 @@ func Min(t *BinaryTree) (*BinaryTree, error) {
 	return t, nil
 }
 
+// Search finds the value in the tree.
 func Search(t *BinaryTree, v int) (*BinaryTree, error) {
 	if t == nil {
 		return nil, ErrNotFound
@@ -64,6 +69,7 @@ func Search(t *BinaryTree, v int) (*BinaryTree, error) {
 	return t, nil
 }
 
+// Delete removes the value from the tree.
 func Delete(t *BinaryTree, v int) (*BinaryTree, error) {
 	var newChild *BinaryTree
 
@@ -126,6 +132,8 @@ func Delete(t *BinaryTree, v int) (*BinaryTree, error) {
 }
 
 var (
+	// ErrNilTree is returned when a provided tree argument is nil.
 	ErrNilTree  = errors.New("nil tree invalid")
+	// ErrNotFound is returned when a value is not present in the tree.
 	ErrNotFound = errors.New("value not found in tree")
 )
