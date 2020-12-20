@@ -8,7 +8,7 @@ import (
 var ErrCyclicGraph = errors.New("graph is cyclic")
 
 const (
-	unmarked = 0
+	unmarked  = 0
 	temporary = 1
 	permanent = 2
 )

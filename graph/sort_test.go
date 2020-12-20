@@ -23,13 +23,13 @@ func Test_cyclic_graph_should_return_error(t *testing.T) {
 
 func Test_acyclic_graphs_when(t *testing.T) {
 	tt := map[string]struct {
-		g graph.Graph
+		g     graph.Graph
 		order []int
 	}{
-		"empty graph": {graph.New(), []int{}},
-		"single node": {graph.New(graph.Vertices(1)), []int{0}},
-		"three node chain": {graph.New(graph.Vertices(3), graph.Upward(map[int][]int{1: {0}, 2:{1}})), []int{2, 1, 0}},
-		"example graph": {exampleGraph(), []int{2, 1, 4, 0, 3, 7, 6, 5}},
+		"empty graph":           {graph.New(), []int{}},
+		"single node":           {graph.New(graph.Vertices(1)), []int{0}},
+		"three node chain":      {graph.New(graph.Vertices(3), graph.Upward(map[int][]int{1: {0}, 2: {1}})), []int{2, 1, 0}},
+		"example graph":         {exampleGraph(), []int{2, 1, 4, 0, 3, 7, 6, 5}},
 		"reverse example graph": {reverso(), []int{7, 6, 5, 4, 3, 2, 1, 0}},
 	}
 
@@ -49,7 +49,7 @@ func Test_acyclic_graphs_when(t *testing.T) {
 func exampleGraph() graph.Graph {
 	return graph.New(
 		graph.Vertices(8),
-		graph.Upward(map[int][]int {
+		graph.Upward(map[int][]int{
 			0: {3},
 			1: {3, 4},
 			2: {4, 7},
@@ -62,7 +62,7 @@ func exampleGraph() graph.Graph {
 func reverso() graph.Graph {
 	return graph.New(
 		graph.Vertices(8),
-		graph.Downward(map[int][]int {
+		graph.Downward(map[int][]int{
 			0: {3},
 			1: {3, 4},
 			2: {4, 7},
@@ -71,4 +71,3 @@ func reverso() graph.Graph {
 		}),
 	)
 }
-

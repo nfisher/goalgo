@@ -10,7 +10,6 @@ func Directed() *adjacency.List {
 	return &adjacency.List{}
 }
 
-
 // Graph interface for various forms of graphs.
 type Graph interface {
 	Edge(v, w int) error

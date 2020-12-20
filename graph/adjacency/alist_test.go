@@ -19,7 +19,7 @@ func Test_average_degree(t *testing.T) {
 		err     error
 	}{
 		{"no vertices", graph.New(), -1.0, errors.ErrNoVertices},
-		{"with connections", graph.New( graph.Vertices(3), graph.Upward(map[int][]int{ 1: {0, 2} })), 2.0 / 3.0 * 2.0, nil},
+		{"with connections", graph.New(graph.Vertices(3), graph.Upward(map[int][]int{1: {0, 2}})), 2.0 / 3.0 * 2.0, nil},
 	}
 
 	for _, tc := range td {
@@ -174,7 +174,7 @@ func Test_counters(t *testing.T) {
 		{"Vertices() for populated list", graph.New(graph.Vertices(2), graph.Upward(map[int][]int{1: {0}})).Vertices(), 2},
 		{"Edges() for empty list", graph.New().Edges(), 0},
 		{"Edges() for populated list", graph.New(graph.Vertices(1)).Edges(), 0},
-		{"Edges() for populated list with edge", graph.New(graph.Vertices(3), graph.Upward(map[int][]int{1: {0}, 2:{0,1}})).Edges(), 3},
+		{"Edges() for populated list with edge", graph.New(graph.Vertices(3), graph.Upward(map[int][]int{1: {0}, 2: {0, 1}})).Edges(), 3},
 	}
 
 	for _, tc := range td {
@@ -188,7 +188,7 @@ func Test_counters(t *testing.T) {
 
 func Test_EncodeJSON(t *testing.T) {
 	var buf bytes.Buffer
-	l := graph.New(graph.Vertices(4), graph.Upward(map[int][]int{1: {0,3}, 2:{1}, 3:{2}}))
+	l := graph.New(graph.Vertices(4), graph.Upward(map[int][]int{1: {0, 3}, 2: {1}, 3: {2}}))
 
 	enc := json.NewEncoder(&buf)
 	err := enc.Encode(&l)
@@ -221,4 +221,3 @@ func Test_DecodeJSON(t *testing.T) {
 		t.Errorf("Edges() = %v, want 4", as.Edges())
 	}
 }
-
