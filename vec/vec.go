@@ -2,6 +2,7 @@
 // Currently it provides only an integer based vector.
 //
 // As a quick start:
+//			var intValues = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 //			v := Vec(intValues...)
 //			v2 := Update(v, 10, 8)
 //			i := Lookup(v, 10)
