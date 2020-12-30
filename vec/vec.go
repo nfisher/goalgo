@@ -1,3 +1,13 @@
+// Package vec is a Clojure inspired immutable vector.
+// Currently it provides only an integer based vector.
+//
+// As a quick start:
+//			v := Vec(intValues...)
+//			v2 := Update(v, 10, 8)
+//			i := Lookup(v, 10)
+//			fmt.Println(i)
+//			// Output:
+//			// 11
 package vec
 
 import (
