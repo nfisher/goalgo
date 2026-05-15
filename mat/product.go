@@ -1,5 +1,13 @@
 package mat
 
+import (
+	"errors"
+	"runtime"
+	"sync"
+)
+
+var errPackedDimensionMismatch = errors.New("mat: packed B dimension mismatch")
+
 // MulGaxpy is a General AXPY algorithm to multiple 2 matrices.
 // Author: @james-bowman
 func MulGaxpy(c, a, b *Dense) error {
@@ -236,6 +244,239 @@ func MulSimdIJK(c, a, b *Dense) error {
 		}
 	}
 	return nil
+}
+
+// MulDotTransposed multiplies dense matrices by transposing B once so each
+// output becomes a contiguous dot product.
+func MulDotTransposed(c, a, b *Dense) error {
+	const colBlock = 4
+	const dotUnroll = 8
+
+	aCols := a.Columns()
+	aRows := a.Rows()
+	bCols := b.Columns()
+	cdata := c.data
+
+	bt := make([]float64, len(b.data))
+	transposeDense(bt, b.data, aCols, bCols)
+
+	bounded := aCols / dotUnroll * dotUnroll
+	for ar := 0; ar < aRows; ar++ {
+		aStart := ar * aCols
+		aRow := a.data[aStart : aStart+aCols]
+		cStart := ar * bCols
+
+		bc := 0
+		for ; bc+colBlock <= bCols; bc += colBlock {
+			b0Start := (bc + 0) * aCols
+			b1Start := (bc + 1) * aCols
+			b2Start := (bc + 2) * aCols
+			b3Start := (bc + 3) * aCols
+
+			b0 := bt[b0Start : b0Start+aCols]
+			b1 := bt[b1Start : b1Start+aCols]
+			b2 := bt[b2Start : b2Start+aCols]
+			b3 := bt[b3Start : b3Start+aCols]
+
+			var sum0 float64
+			var sum1 float64
+			var sum2 float64
+			var sum3 float64
+
+			for ac := 0; ac < bounded; ac += dotUnroll {
+				av0 := aRow[ac+0]
+				av1 := aRow[ac+1]
+				av2 := aRow[ac+2]
+				av3 := aRow[ac+3]
+				av4 := aRow[ac+4]
+				av5 := aRow[ac+5]
+				av6 := aRow[ac+6]
+				av7 := aRow[ac+7]
+
+				sum0 += av0*b0[ac+0] + av1*b0[ac+1] + av2*b0[ac+2] + av3*b0[ac+3]
+				sum0 += av4*b0[ac+4] + av5*b0[ac+5] + av6*b0[ac+6] + av7*b0[ac+7]
+				sum1 += av0*b1[ac+0] + av1*b1[ac+1] + av2*b1[ac+2] + av3*b1[ac+3]
+				sum1 += av4*b1[ac+4] + av5*b1[ac+5] + av6*b1[ac+6] + av7*b1[ac+7]
+				sum2 += av0*b2[ac+0] + av1*b2[ac+1] + av2*b2[ac+2] + av3*b2[ac+3]
+				sum2 += av4*b2[ac+4] + av5*b2[ac+5] + av6*b2[ac+6] + av7*b2[ac+7]
+				sum3 += av0*b3[ac+0] + av1*b3[ac+1] + av2*b3[ac+2] + av3*b3[ac+3]
+				sum3 += av4*b3[ac+4] + av5*b3[ac+5] + av6*b3[ac+6] + av7*b3[ac+7]
+			}
+
+			for ac := bounded; ac < aCols; ac++ {
+				av := aRow[ac]
+				sum0 += av * b0[ac]
+				sum1 += av * b1[ac]
+				sum2 += av * b2[ac]
+				sum3 += av * b3[ac]
+			}
+
+			cdata[cStart+bc+0] = sum0
+			cdata[cStart+bc+1] = sum1
+			cdata[cStart+bc+2] = sum2
+			cdata[cStart+bc+3] = sum3
+		}
+
+		for ; bc < bCols; bc++ {
+			bStart := bc * aCols
+			bRow := bt[bStart : bStart+aCols]
+			var sum float64
+			for ac := 0; ac < bounded; ac += dotUnroll {
+				sum += aRow[ac+0] * bRow[ac+0]
+				sum += aRow[ac+1] * bRow[ac+1]
+				sum += aRow[ac+2] * bRow[ac+2]
+				sum += aRow[ac+3] * bRow[ac+3]
+				sum += aRow[ac+4] * bRow[ac+4]
+				sum += aRow[ac+5] * bRow[ac+5]
+				sum += aRow[ac+6] * bRow[ac+6]
+				sum += aRow[ac+7] * bRow[ac+7]
+			}
+			for ac := bounded; ac < aCols; ac++ {
+				sum += aRow[ac] * bRow[ac]
+			}
+			cdata[cStart+bc] = sum
+		}
+	}
+
+	return nil
+}
+
+// MulDotTransposedSimd multiplies dense matrices by transposing B once and
+// delegating each contiguous dot product to an architecture-specific kernel.
+func MulDotTransposedSimd(c, a, b *Dense) error {
+	return MulPackedDotTransposedSimd(c, a, PackBTransposed(b))
+}
+
+// PackedB stores B in transposed row-major form so matrix multiply can reuse a
+// contiguous packed representation across repeated multiplies.
+type PackedB struct {
+	rows int
+	cols int
+	data []float64
+}
+
+// PackBTransposed copies B into a transposed contiguous layout.
+func PackBTransposed(b *Dense) *PackedB {
+	packed := &PackedB{
+		rows: b.Rows(),
+		cols: b.Columns(),
+		data: make([]float64, len(b.data)),
+	}
+	transposeDense(packed.data, b.data, packed.rows, packed.cols)
+	return packed
+}
+
+// MulPackedDotTransposedSimd multiplies A by a transposed packed-B buffer.
+func MulPackedDotTransposedSimd(c, a *Dense, packed *PackedB) error {
+	aCols := a.Columns()
+	aRows := a.Rows()
+	bCols := packed.cols
+
+	if packed.rows != aCols {
+		return errPackedDimensionMismatch
+	}
+	if aRows*bCols < 128*128 {
+		mulPackedDotTransposedSimdRows(c.data, a, packed, 0, aRows)
+		return nil
+	}
+
+	workers := runtime.GOMAXPROCS(0)
+	if workers > aRows {
+		workers = aRows
+	}
+	if workers < 2 {
+		mulPackedDotTransposedSimdRows(c.data, a, packed, 0, aRows)
+		return nil
+	}
+
+	chunk := (aRows + workers - 1) / workers
+	var wg sync.WaitGroup
+	for start := 0; start < aRows; start += chunk {
+		end := start + chunk
+		if end > aRows {
+			end = aRows
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			mulPackedDotTransposedSimdRows(c.data, a, packed, start, end)
+		}(start, end)
+	}
+	wg.Wait()
+	return nil
+}
+
+func mulPackedDotTransposedSimdRows(cdata []float64, a *Dense, packed *PackedB, rowStart, rowEnd int) {
+	aCols := a.Columns()
+	bCols := packed.cols
+
+	for ar := rowStart; ar < rowEnd; ar++ {
+		aStart := ar * aCols
+		aRow := a.data[aStart : aStart+aCols]
+		cStart := ar * bCols
+
+		bc := 0
+		for ; bc+8 <= bCols; bc += 8 {
+			b0Start := (bc + 0) * aCols
+			b1Start := (bc + 1) * aCols
+			b2Start := (bc + 2) * aCols
+			b3Start := (bc + 3) * aCols
+			b4Start := (bc + 4) * aCols
+			b5Start := (bc + 5) * aCols
+			b6Start := (bc + 6) * aCols
+			b7Start := (bc + 7) * aCols
+
+			b0 := packed.data[b0Start : b0Start+aCols]
+			b1 := packed.data[b1Start : b1Start+aCols]
+			b2 := packed.data[b2Start : b2Start+aCols]
+			b3 := packed.data[b3Start : b3Start+aCols]
+			b4 := packed.data[b4Start : b4Start+aCols]
+			b5 := packed.data[b5Start : b5Start+aCols]
+			b6 := packed.data[b6Start : b6Start+aCols]
+			b7 := packed.data[b7Start : b7Start+aCols]
+			s0, s1, s2, s3, s4, s5, s6, s7 := dotProductOct(aRow, b0, b1, b2, b3, b4, b5, b6, b7)
+			cdata[cStart+bc+0] = s0
+			cdata[cStart+bc+1] = s1
+			cdata[cStart+bc+2] = s2
+			cdata[cStart+bc+3] = s3
+			cdata[cStart+bc+4] = s4
+			cdata[cStart+bc+5] = s5
+			cdata[cStart+bc+6] = s6
+			cdata[cStart+bc+7] = s7
+		}
+
+		for ; bc+4 <= bCols; bc += 4 {
+			b0Start := (bc + 0) * aCols
+			b1Start := (bc + 1) * aCols
+			b2Start := (bc + 2) * aCols
+			b3Start := (bc + 3) * aCols
+
+			b0 := packed.data[b0Start : b0Start+aCols]
+			b1 := packed.data[b1Start : b1Start+aCols]
+			b2 := packed.data[b2Start : b2Start+aCols]
+			b3 := packed.data[b3Start : b3Start+aCols]
+			s0, s1, s2, s3 := dotProductQuad(aRow, b0, b1, b2, b3)
+			cdata[cStart+bc+0] = s0
+			cdata[cStart+bc+1] = s1
+			cdata[cStart+bc+2] = s2
+			cdata[cStart+bc+3] = s3
+		}
+
+		for ; bc < bCols; bc++ {
+			bStart := bc * aCols
+			bRow := packed.data[bStart : bStart+aCols]
+			cdata[cStart+bc] = dotProductUnitary(aRow, bRow)
+		}
+	}
+}
+
+func transposeDense(dst, src []float64, rows, cols int) {
+	for r := 0; r < rows; r++ {
+		srcStart := r * cols
+		for c := 0; c < cols; c++ {
+			dst[c*rows+r] = src[srcStart+c]
+		}
+	}
 }
 
 // MulNaiveKIJ multiplies matrices.

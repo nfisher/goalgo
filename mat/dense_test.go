@@ -46,6 +46,8 @@ var ff = []struct {
 	product func(c, a, b *mat.Dense) error
 }{
 	{"simd ijk", mat.MulSimdIJK},
+	{"dot transposed", mat.MulDotTransposed},
+	{"dot transposed simd", mat.MulDotTransposedSimd},
 	{"block8 ijk", mat.MulBlockIJK(8)},
 	{"block16 ijk", mat.MulBlockIJK(16)},
 	{"bunroll8 ijk", mat.MulBlockUnrollIJK(8)},
@@ -113,6 +115,33 @@ func Test_Product(t *testing.T) {
 	}
 }
 
+func Test_MulPackedDotTransposedSimd(t *testing.T) {
+	td := []struct {
+		name     string
+		a        *mat.Dense
+		b        *mat.Dense
+		expected []float64
+	}{
+		{"[3,2] x [2,1]", mat.NewDense(3, 2, []float64{1, 2, 3, 4, 5, 6}), mat.NewDense(2, 1, []float64{2, 4}), []float64{10, 22, 34}},
+		{"[4,3] x [3,2]", mat.NewDense(4, 3, []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}), mat.NewDense(3, 2, []float64{2, 7, 1, 2, 3, 6}), []float64{13, 29, 31, 74, 49, 119, 67, 164}},
+		{"[16,16] x [16,16]", mat.NewDense(16, 16, matSixteen), mat.NewDense(16, 16, matSixteen), matSixteenProduct},
+	}
+
+	for _, tc := range td {
+		t.Run(tc.name, func(t *testing.T) {
+			packed := mat.PackBTransposed(tc.b)
+			c := mat.NewDense(tc.a.Rows(), tc.b.Columns(), make([]float64, tc.a.Rows()*tc.b.Columns()))
+			err := mat.MulPackedDotTransposedSimd(c, tc.a, packed)
+			if err != nil {
+				t.Fatalf("err = %v, want nil", err)
+			}
+			if !reflect.DeepEqual(c.Raw(), tc.expected) {
+				t.Errorf("raw = %v, want %v", c.Raw(), tc.expected)
+			}
+		})
+	}
+}
+
 func Benchmark_Dot(b *testing.B) {
 	if testing.Short() {
 		b.Skip()
@@ -150,6 +179,27 @@ func Benchmark_Product(b *testing.B) {
 				DotResult = cMat
 			})
 		}
+	}
+}
+
+func Benchmark_ProductPacked(b *testing.B) {
+	var sizes = sizes
+	if testing.Short() {
+		sizes = []int{1024}
+	}
+	for _, sz := range sizes {
+		dim := sz * sz
+		aMat := mat.NewDense(sz, sz, aArr[:dim])
+		bMat := mat.NewDense(sz, sz, bArr[:dim])
+		packedB := mat.PackBTransposed(bMat)
+		cMat := mat.NewDense(sz, sz, make([]float64, dim))
+
+		b.Run(fmt.Sprintf("dot transposed simd packed %v", sz), func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				_ = mat.MulPackedDotTransposedSimd(cMat, aMat, packedB)
+			}
+			DotResult = cMat
+		})
 	}
 }
 

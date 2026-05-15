@@ -1,0 +1,89 @@
+#include "textflag.h"
+
+// func dotProductQuad(a, b0, b1, b2, b3 []float64) (s0, s1, s2, s3 float64)
+TEXT ·dotProductQuad(SB), NOSPLIT, $0-152
+	MOVQ a_base+0(FP), SI
+	MOVQ b0_base+24(FP), DI
+	MOVQ b1_base+48(FP), R8
+	MOVQ b2_base+72(FP), R9
+	MOVQ b3_base+96(FP), R10
+	MOVQ a_len+8(FP), CX
+
+	PXOR X0, X0
+	PXOR X1, X1
+	PXOR X2, X2
+	PXOR X3, X3
+
+	MOVQ CX, AX
+	ANDQ $-2, AX
+	JEQ tail
+
+loop2:
+	MOVUPD (SI), X4
+
+	MOVAPD X4, X5
+	MULPD (DI), X5
+	ADDPD X5, X0
+
+	MOVAPD X4, X6
+	MULPD (R8), X6
+	ADDPD X6, X1
+
+	MOVAPD X4, X7
+	MULPD (R9), X7
+	ADDPD X7, X2
+
+	MULPD (R10), X4
+	ADDPD X4, X3
+
+	ADDQ $16, SI
+	ADDQ $16, DI
+	ADDQ $16, R8
+	ADDQ $16, R9
+	ADDQ $16, R10
+	SUBQ $2, AX
+	JNE loop2
+
+tail:
+	MOVAPD X0, X4
+	UNPCKHPD X4, X4
+	ADDSD X4, X0
+
+	MOVAPD X1, X4
+	UNPCKHPD X4, X4
+	ADDSD X4, X1
+
+	MOVAPD X2, X4
+	UNPCKHPD X4, X4
+	ADDSD X4, X2
+
+	MOVAPD X3, X4
+	UNPCKHPD X4, X4
+	ADDSD X4, X3
+
+	ANDQ $1, CX
+	JEQ store
+
+	MOVSD (SI), X4
+
+	MOVAPD X4, X5
+	MULSD (DI), X5
+	ADDSD X5, X0
+
+	MOVAPD X4, X6
+	MULSD (R8), X6
+	ADDSD X6, X1
+
+	MOVAPD X4, X7
+	MULSD (R9), X7
+	ADDSD X7, X2
+
+	MULSD (R10), X4
+	ADDSD X4, X3
+
+store:
+	MOVSD X0, s0+120(FP)
+	MOVSD X1, s1+128(FP)
+	MOVSD X2, s2+136(FP)
+	MOVSD X3, s3+144(FP)
+	RET

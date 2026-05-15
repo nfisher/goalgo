@@ -1,3 +1,5 @@
+//go:build amd64
+
 package mat
 
 // AxpyLoop loops around an axpy function.
