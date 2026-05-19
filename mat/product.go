@@ -3,10 +3,15 @@ package mat
 import (
 	"errors"
 	"runtime"
-	"sync"
 )
 
 var errPackedDimensionMismatch = errors.New("mat: packed B dimension mismatch")
+
+const (
+	minParallelCells     = 128 * 128
+	minColumnParallelOps = 64 * 64 * 64
+	transposeBlockSize   = 32
+)
 
 // MulGaxpy is a General AXPY algorithm to multiple 2 matrices.
 // Author: @james-bowman
@@ -19,9 +24,9 @@ func MulGaxpy(c, a, b *Dense) error {
 	// IKJ
 	for i := 0; i < aRows; i++ {
 		for k := 0; k < aCols; k++ {
-			s := a.data[i*aCols+k]
-			ib := i * bCols
-			kb := k * bCols
+			s := a.data[i*a.stride+k]
+			ib := i * c.stride
+			kb := k * b.stride
 			for j := 0; j < bCols; j++ {
 				data[ib+j] += s * b.data[kb+j]
 			}
@@ -39,15 +44,14 @@ func MulGonumNaivePrefetch(c, a, b *Dense) error {
 	row := make([]float64, aCols)
 	var data = c.data
 	for ar := 0; ar < aRows; ar++ {
-		for i := range row {
-			row[i] = a.At(ar, i)
-		}
+		aStart := ar * a.stride
+		copy(row, a.data[aStart:aStart+aCols])
 		for bc := 0; bc < bCols; bc++ {
 			var sum float64
 			for i, e := range row {
-				sum += e * b.At(i, bc)
+				sum += e * b.data[i*b.stride+bc]
 			}
-			di := ar*bCols + bc
+			di := ar*c.stride + bc
 			data[di] = sum
 		}
 	}
@@ -62,12 +66,14 @@ func MulGonumNaive(c, a, b *Dense) error {
 	bCols := b.Columns()
 
 	for ar := 0; ar < aRows; ar++ {
+		aStart := ar * a.stride
+		cStart := ar * c.stride
 		for bc := 0; bc < bCols; bc++ {
 			var sum float64
 			for ac := 0; ac < aCols; ac++ {
-				sum += a.At(ar, ac) * b.At(ac, bc)
+				sum += a.data[aStart+ac] * b.data[ac*b.stride+bc]
 			}
-			c.Set(ar, bc, sum)
+			c.data[cStart+bc] = sum
 		}
 	}
 
@@ -97,10 +103,10 @@ func MulMultiplePrefetch2(c, a, b *Dense) error {
 
 	for i := 0; i < aRows; i += 4 {
 		for j := 0; j < aCols; j++ {
-			buffer0[j] = a.data[i*aCols+j]
-			buffer1[j] = a.data[(i+1)*aCols+j]
-			buffer2[j] = a.data[(i+2)*aCols+j]
-			buffer3[j] = a.data[(i+3)*aCols+j]
+			buffer0[j] = a.data[i*a.stride+j]
+			buffer1[j] = a.data[(i+1)*a.stride+j]
+			buffer2[j] = a.data[(i+2)*a.stride+j]
+			buffer3[j] = a.data[(i+3)*a.stride+j]
 		}
 		for j := 0; j < bCols; j++ {
 			sum0 = 0
@@ -108,16 +114,16 @@ func MulMultiplePrefetch2(c, a, b *Dense) error {
 			sum2 = 0
 			sum3 = 0
 			for k := 0; k < aCols; k++ {
-				bi := k*bCols + j
+				bi := k*b.stride + j
 				sum0 += buffer0[k] * b.data[bi]
 				sum1 += buffer1[k] * b.data[bi]
 				sum2 += buffer2[k] * b.data[bi]
 				sum3 += buffer3[k] * b.data[bi]
 			}
-			data[i*bCols+j] = sum0
-			data[(i+1)*bCols+j] = sum1
-			data[(i+2)*bCols+j] = sum2
-			data[(i+3)*bCols+j] = sum3
+			data[i*c.stride+j] = sum0
+			data[(i+1)*c.stride+j] = sum1
+			data[(i+2)*c.stride+j] = sum2
+			data[(i+3)*c.stride+j] = sum3
 		}
 	}
 	return nil
@@ -135,30 +141,34 @@ func MulGonumUnroll(c, a, b *Dense) error {
 		bounded = aCols / stride * stride
 	}
 	for ar := 0; ar < a.Rows(); ar++ {
+		aStart := ar * a.stride
+		cStart := ar * c.stride
 		for bc := 0; bc < bCols; bc++ {
 			var sum float64
-			di := ar*bCols + bc
+			di := cStart + bc
 			for ac := 0; ac < bounded; ac += stride {
-				ac0 := ac
-				ac1 := ac0 + 1
-				ac2 := ac0 + 2
-				ac3 := ac0 + 3
-				ac4 := ac0 + 4
-				ac5 := ac0 + 5
-				ac6 := ac0 + 6
-				ac7 := ac0 + 7
-				sum += a.At(ar, ac0) * b.At(ac0, bc)
-				sum += a.At(ar, ac1) * b.At(ac1, bc)
-				sum += a.At(ar, ac2) * b.At(ac2, bc)
-				sum += a.At(ar, ac3) * b.At(ac3, bc)
-				sum += a.At(ar, ac4) * b.At(ac4, bc)
-				sum += a.At(ar, ac5) * b.At(ac5, bc)
-				sum += a.At(ar, ac6) * b.At(ac6, bc)
-				sum += a.At(ar, ac7) * b.At(ac7, bc)
+				b0 := ac*b.stride + bc
+				b1 := b0 + b.stride
+				b2 := b1 + b.stride
+				b3 := b2 + b.stride
+				b4 := b3 + b.stride
+				b5 := b4 + b.stride
+				b6 := b5 + b.stride
+				b7 := b6 + b.stride
+
+				a0 := aStart + ac
+				sum += a.data[a0+0] * b.data[b0]
+				sum += a.data[a0+1] * b.data[b1]
+				sum += a.data[a0+2] * b.data[b2]
+				sum += a.data[a0+3] * b.data[b3]
+				sum += a.data[a0+4] * b.data[b4]
+				sum += a.data[a0+5] * b.data[b5]
+				sum += a.data[a0+6] * b.data[b6]
+				sum += a.data[a0+7] * b.data[b7]
 			}
 
 			for ac := bounded; ac < aCols; ac++ {
-				sum += a.At(ar, ac) * b.At(ac, bc)
+				sum += a.data[aStart+ac] * b.data[ac*b.stride+bc]
 			}
 			data[di] = sum
 		}
@@ -176,10 +186,10 @@ func MulNaiveIKJ(c, a, b *Dense) error {
 
 	for ar := 0; ar < aRows; ar++ {
 		for bc := 0; bc < bCols; bc++ {
-			di := ar*bCols + bc
+			di := ar*c.stride + bc
 			for ac := 0; ac < aCols; ac++ {
-				ai := ar*aCols + ac
-				bi := ac*bCols + bc
+				ai := ar*a.stride + ac
+				bi := ac*b.stride + bc
 				data[di] += a.data[ai] * b.data[bi]
 			}
 		}
@@ -197,10 +207,10 @@ func MulNaiveIJK(c, a, b *Dense) error {
 
 	for ar := 0; ar < aRows; ar++ {
 		for ac := 0; ac < aCols; ac++ {
-			ai := ar*aCols + ac
+			ai := ar*a.stride + ac
 			for bc := 0; bc < bCols; bc++ {
-				di := ar*bCols + bc
-				bi := ac*bCols + bc
+				di := ar*c.stride + bc
+				bi := ac*b.stride + bc
 				data[di] += a.data[ai] * b.data[bi]
 			}
 		}
@@ -218,6 +228,9 @@ func MulSimdIJK(c, a, b *Dense) error {
 	var cdata = c.data
 	var bdata = b.data
 
+	if !denseAllCompact(c, a, b) {
+		return MulNaiveIJK(c, a, b)
+	}
 	if aCols%blockSize != 0 || aRows%blockSize != 0 || bCols%blockSize != 0 {
 		return MulNaiveIJK(c, a, b)
 	}
@@ -257,14 +270,14 @@ func MulDotTransposed(c, a, b *Dense) error {
 	bCols := b.Columns()
 	cdata := c.data
 
-	bt := make([]float64, len(b.data))
-	transposeDense(bt, b.data, aCols, bCols)
+	bt := make([]float64, aCols*bCols)
+	transposeDense(bt, b.data, aCols, bCols, b.stride)
 
 	bounded := aCols / dotUnroll * dotUnroll
 	for ar := 0; ar < aRows; ar++ {
-		aStart := ar * aCols
+		aStart := ar * a.stride
 		aRow := a.data[aStart : aStart+aCols]
-		cStart := ar * bCols
+		cStart := ar * c.stride
 
 		bc := 0
 		for ; bc+colBlock <= bCols; bc += colBlock {
@@ -360,9 +373,9 @@ func PackBTransposed(b *Dense) *PackedB {
 	packed := &PackedB{
 		rows: b.Rows(),
 		cols: b.Columns(),
-		data: make([]float64, len(b.data)),
+		data: make([]float64, b.Rows()*b.Columns()),
 	}
-	transposeDense(packed.data, b.data, packed.rows, packed.cols)
+	transposeDense(packed.data, b.data, packed.rows, packed.cols, b.stride)
 	return packed
 }
 
@@ -375,45 +388,71 @@ func MulPackedDotTransposedSimd(c, a *Dense, packed *PackedB) error {
 	if packed.rows != aCols {
 		return errPackedDimensionMismatch
 	}
-	if aRows*bCols < 128*128 {
-		mulPackedDotTransposedSimdRows(c.data, a, packed, 0, aRows)
+
+	workers := runtime.GOMAXPROCS(0)
+	if shouldParallelizeColumns(aRows, aCols, bCols, workers) {
+		mulPackedDotTransposedSimdColumns(c, a, packed, workers)
 		return nil
 	}
 
-	workers := runtime.GOMAXPROCS(0)
+	if aRows*bCols < minParallelCells {
+		mulPackedDotTransposedSimdRows(c, a, packed, 0, aRows)
+		return nil
+	}
+
 	if workers > aRows {
 		workers = aRows
 	}
 	if workers < 2 {
-		mulPackedDotTransposedSimdRows(c.data, a, packed, 0, aRows)
+		mulPackedDotTransposedSimdRows(c, a, packed, 0, aRows)
 		return nil
 	}
 
 	chunk := (aRows + workers - 1) / workers
-	var wg sync.WaitGroup
-	for start := 0; start < aRows; start += chunk {
-		end := start + chunk
-		if end > aRows {
-			end = aRows
-		}
-		wg.Add(1)
-		go func(start, end int) {
-			defer wg.Done()
-			mulPackedDotTransposedSimdRows(c.data, a, packed, start, end)
-		}(start, end)
-	}
-	wg.Wait()
+	getMatMulWorkerPool(workers).parallel(0, aRows, chunk, func(start, end int) {
+		mulPackedDotTransposedSimdRows(c, a, packed, start, end)
+	})
 	return nil
 }
 
-func mulPackedDotTransposedSimdRows(cdata []float64, a *Dense, packed *PackedB, rowStart, rowEnd int) {
+func shouldParallelizeColumns(aRows, aCols, bCols, workers int) bool {
+	if workers < 2 || aRows >= workers || bCols < 16 {
+		return false
+	}
+	return aRows*aCols*bCols >= minColumnParallelOps
+}
+
+func mulPackedDotTransposedSimdColumns(c, a *Dense, packed *PackedB, workers int) {
+	bCols := packed.cols
+	if workers > bCols {
+		workers = bCols
+	}
+	maxColumnBlocks := (bCols + 7) / 8
+	if workers > maxColumnBlocks {
+		workers = maxColumnBlocks
+	}
+	if workers < 2 {
+		mulPackedDotTransposedSimdRows(c, a, packed, 0, a.Rows())
+		return
+	}
+
+	colsPerWorker := (bCols + workers - 1) / workers
+	colsPerWorker = (colsPerWorker + 7) / 8 * 8
+
+	getMatMulWorkerPool(workers).parallel(0, bCols, colsPerWorker, func(start, end int) {
+		mulPackedDotTransposedSimdColumnsRange(c, a, packed, start, end)
+	})
+}
+
+func mulPackedDotTransposedSimdRows(c, a *Dense, packed *PackedB, rowStart, rowEnd int) {
 	aCols := a.Columns()
 	bCols := packed.cols
+	cdata := c.data
 
 	for ar := rowStart; ar < rowEnd; ar++ {
-		aStart := ar * aCols
+		aStart := ar * a.stride
 		aRow := a.data[aStart : aStart+aCols]
-		cStart := ar * bCols
+		cStart := ar * c.stride
 
 		bc := 0
 		for ; bc+8 <= bCols; bc += 8 {
@@ -470,9 +509,100 @@ func mulPackedDotTransposedSimdRows(cdata []float64, a *Dense, packed *PackedB, 
 	}
 }
 
-func transposeDense(dst, src []float64, rows, cols int) {
+func mulPackedDotTransposedSimdColumnsRange(c, a *Dense, packed *PackedB, colStart, colEnd int) {
+	aCols := a.Columns()
+	aRows := a.Rows()
+	cdata := c.data
+
+	for ar := 0; ar < aRows; ar++ {
+		aStart := ar * a.stride
+		aRow := a.data[aStart : aStart+aCols]
+		cStart := ar * c.stride
+
+		bc := colStart
+		for ; bc+8 <= colEnd; bc += 8 {
+			b0Start := (bc + 0) * aCols
+			b1Start := (bc + 1) * aCols
+			b2Start := (bc + 2) * aCols
+			b3Start := (bc + 3) * aCols
+			b4Start := (bc + 4) * aCols
+			b5Start := (bc + 5) * aCols
+			b6Start := (bc + 6) * aCols
+			b7Start := (bc + 7) * aCols
+
+			b0 := packed.data[b0Start : b0Start+aCols]
+			b1 := packed.data[b1Start : b1Start+aCols]
+			b2 := packed.data[b2Start : b2Start+aCols]
+			b3 := packed.data[b3Start : b3Start+aCols]
+			b4 := packed.data[b4Start : b4Start+aCols]
+			b5 := packed.data[b5Start : b5Start+aCols]
+			b6 := packed.data[b6Start : b6Start+aCols]
+			b7 := packed.data[b7Start : b7Start+aCols]
+			s0, s1, s2, s3, s4, s5, s6, s7 := dotProductOct(aRow, b0, b1, b2, b3, b4, b5, b6, b7)
+			cdata[cStart+bc+0] = s0
+			cdata[cStart+bc+1] = s1
+			cdata[cStart+bc+2] = s2
+			cdata[cStart+bc+3] = s3
+			cdata[cStart+bc+4] = s4
+			cdata[cStart+bc+5] = s5
+			cdata[cStart+bc+6] = s6
+			cdata[cStart+bc+7] = s7
+		}
+
+		for ; bc+4 <= colEnd; bc += 4 {
+			b0Start := (bc + 0) * aCols
+			b1Start := (bc + 1) * aCols
+			b2Start := (bc + 2) * aCols
+			b3Start := (bc + 3) * aCols
+
+			b0 := packed.data[b0Start : b0Start+aCols]
+			b1 := packed.data[b1Start : b1Start+aCols]
+			b2 := packed.data[b2Start : b2Start+aCols]
+			b3 := packed.data[b3Start : b3Start+aCols]
+			s0, s1, s2, s3 := dotProductQuad(aRow, b0, b1, b2, b3)
+			cdata[cStart+bc+0] = s0
+			cdata[cStart+bc+1] = s1
+			cdata[cStart+bc+2] = s2
+			cdata[cStart+bc+3] = s3
+		}
+
+		for ; bc < colEnd; bc++ {
+			bStart := bc * aCols
+			bRow := packed.data[bStart : bStart+aCols]
+			cdata[cStart+bc] = dotProductUnitary(aRow, bRow)
+		}
+	}
+}
+
+func transposeDense(dst, src []float64, rows, cols, srcStride int) {
+	if rows < transposeBlockSize || cols < transposeBlockSize {
+		transposeDenseSimple(dst, src, rows, cols, srcStride)
+		return
+	}
+
+	for c0 := 0; c0 < cols; c0 += transposeBlockSize {
+		cEnd := c0 + transposeBlockSize
+		if cEnd > cols {
+			cEnd = cols
+		}
+		for r0 := 0; r0 < rows; r0 += transposeBlockSize {
+			rEnd := r0 + transposeBlockSize
+			if rEnd > rows {
+				rEnd = rows
+			}
+			for c := c0; c < cEnd; c++ {
+				dstStart := c*rows + r0
+				for r := r0; r < rEnd; r++ {
+					dst[dstStart+r-r0] = src[r*srcStride+c]
+				}
+			}
+		}
+	}
+}
+
+func transposeDenseSimple(dst, src []float64, rows, cols, srcStride int) {
 	for r := 0; r < rows; r++ {
-		srcStart := r * cols
+		srcStart := r * srcStride
 		for c := 0; c < cols; c++ {
 			dst[c*rows+r] = src[srcStart+c]
 		}
@@ -488,10 +618,10 @@ func MulNaiveKIJ(c, a, b *Dense) error {
 
 	for bc := 0; bc < bCols; bc++ {
 		for ar := 0; ar < aRows; ar++ {
-			di := ar*bCols + bc
+			di := ar*c.stride + bc
 			for ac := 0; ac < aCols; ac++ {
-				ai := ar*aCols + ac
-				bi := ac*bCols + bc
+				ai := ar*a.stride + ac
+				bi := ac*b.stride + bc
 				data[di] += a.data[ai] * b.data[bi]
 			}
 		}
@@ -509,10 +639,10 @@ func MulNaiveJIK(c, a, b *Dense) error {
 
 	for ac := 0; ac < aCols; ac++ {
 		for ar := 0; ar < aRows; ar++ {
-			ai := ar*aCols + ac
+			ai := ar*a.stride + ac
 			for bc := 0; bc < bCols; bc++ {
-				di := ar*bCols + bc
-				bi := ac*bCols + bc
+				di := ar*c.stride + bc
+				bi := ac*b.stride + bc
 				data[di] += a.data[ai] * b.data[bi]
 			}
 		}
@@ -530,10 +660,10 @@ func MulNaiveJKI(c, a, b *Dense) error {
 
 	for ac := 0; ac < aCols; ac++ {
 		for bc := 0; bc < bCols; bc++ {
-			bi := ac*bCols + bc
+			bi := ac*b.stride + bc
 			for ar := 0; ar < aRows; ar++ {
-				ai := ar*aCols + ac
-				di := ar*bCols + bc
+				ai := ar*a.stride + ac
+				di := ar*c.stride + bc
 				data[di] += a.data[ai] * b.data[bi]
 			}
 		}
@@ -552,10 +682,10 @@ func MulNaiveKJI(c, a, b *Dense) error {
 
 	for bc := 0; bc < bCols; bc++ {
 		for ac := 0; ac < aCols; ac++ {
-			bi := ac*bCols + bc
+			bi := ac*b.stride + bc
 			for ar := 0; ar < aRows; ar++ {
-				ai := ar*aCols + ac
-				di := ar*bCols + bc
+				ai := ar*a.stride + ac
+				di := ar*c.stride + bc
 				data[di] += a.data[ai] * b.data[bi]
 			}
 		}
@@ -572,6 +702,9 @@ func MulBlockIJK(blockSize int) func(c, a, b *Dense) error {
 		bCols := b.Columns()
 		var data = c.data
 
+		if !denseAllCompact(c, a, b) {
+			return MulNaiveIJK(c, a, b)
+		}
 		if aCols%blockSize != 0 || aRows%blockSize != 0 || bCols%blockSize != 0 {
 			return MulNaiveIJK(c, a, b)
 		}
@@ -608,6 +741,9 @@ func MulBlockUnrollIJK(blockSize int) func(c, a, b *Dense) error {
 		bCols := b.Columns()
 		var data = c.data
 
+		if !denseAllCompact(c, a, b) {
+			return MulNaiveIJK(c, a, b)
+		}
 		if aCols%blockSize != 0 || aRows%blockSize != 0 || bCols%blockSize != 0 {
 			return MulNaiveIJK(c, a, b)
 		}
@@ -648,6 +784,9 @@ func MulBlockFetchIJK(blockSize int) func(c, a, b *Dense) error {
 		row := make([]float64, blockSize)
 		var data = c.data
 
+		if !denseAllCompact(c, a, b) {
+			return MulNaiveIJK(c, a, b)
+		}
 		if aCols%blockSize != 0 || aRows%blockSize != 0 || bCols%blockSize != 0 {
 			return MulNaiveIJK(c, a, b)
 		}
@@ -696,14 +835,14 @@ func MulUnroll(c, a, b *Dense) error {
 	for ar := 0; ar < aRows; ar++ {
 		for bc := 0; bc < bCols; bc++ {
 			var sum float64
-			di := ar*bCols + bc
+			di := ar*c.stride + bc
 			for ac := 0; ac < bounded; ac += stride {
-				b0 := ac*bCols + bc
-				b1 := b0 + bCols
-				b2 := b1 + bCols
-				b3 := b2 + bCols
+				b0 := ac*b.stride + bc
+				b1 := b0 + b.stride
+				b2 := b1 + b.stride
+				b3 := b2 + b.stride
 
-				a0 := ar*aCols + ac
+				a0 := ar*a.stride + ac
 				a1 := a0 + 1
 				a2 := a1 + 1
 				a3 := a2 + 1
@@ -725,8 +864,8 @@ func MulUnroll(c, a, b *Dense) error {
 				sum += sum0 + sum1 + sum2 + sum3
 			}
 			for ac := bounded; ac < aCols; ac++ {
-				ai := ar*aCols + ac
-				bi := ac*bCols + bc
+				ai := ar*a.stride + ac
+				bi := ac*b.stride + bc
 				sum += a.data[ai] * b.data[bi]
 			}
 			data[di] = sum

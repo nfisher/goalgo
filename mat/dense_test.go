@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/nfisher/goalgo/mat"
@@ -41,11 +42,45 @@ func Test_HexadecAxpy(t *testing.T) {
 	}
 }
 
+func Test_DenseWithStride(t *testing.T) {
+	d := mat.NewDenseWithStride(2, 3, 5, nil)
+	if got, want := d.Stride(), 5; got != want {
+		t.Fatalf("stride = %v, want %v", got, want)
+	}
+	d.Set(1, 2, 42)
+	if got, want := d.At(1, 2), float64(42); got != want {
+		t.Fatalf("At(1,2) = %v, want %v", got, want)
+	}
+	if got, want := d.Raw()[5+2], float64(42); got != want {
+		t.Fatalf("raw stride value = %v, want %v", got, want)
+	}
+}
+
+func Test_DenseView(t *testing.T) {
+	d := mat.NewDense(3, 4, []float64{
+		1, 2, 3, 4,
+		5, 6, 7, 8,
+		9, 10, 11, 12,
+	})
+	v := d.View(1, 1, 2, 2)
+	if got, want := v.Stride(), d.Stride(); got != want {
+		t.Fatalf("view stride = %v, want %v", got, want)
+	}
+	if got, want := v.At(1, 1), float64(11); got != want {
+		t.Fatalf("view At(1,1) = %v, want %v", got, want)
+	}
+	v.Set(0, 1, 70)
+	if got, want := d.At(1, 2), float64(70); got != want {
+		t.Fatalf("base At(1,2) = %v, want %v", got, want)
+	}
+}
+
 var ff = []struct {
 	name    string
 	product func(c, a, b *mat.Dense) error
 }{
 	{"simd ijk", mat.MulSimdIJK},
+	{"blocked gemm", mat.MulBlockedGemm},
 	{"dot transposed", mat.MulDotTransposed},
 	{"dot transposed simd", mat.MulDotTransposedSimd},
 	{"block8 ijk", mat.MulBlockIJK(8)},
@@ -115,6 +150,36 @@ func Test_Product(t *testing.T) {
 	}
 }
 
+func Test_ProductStrided(t *testing.T) {
+	a := mat.NewDenseWithStride(2, 3, 5, []float64{
+		1, 2, 3, 0, 0,
+		4, 5, 6, 0, 0,
+	})
+	b := mat.NewDenseWithStride(3, 2, 4, []float64{
+		7, 8, 0, 0,
+		9, 10, 0, 0,
+		11, 12, 0, 0,
+	})
+	expected := []float64{58, 64, 139, 154}
+
+	for _, f := range ff {
+		t.Run(f.name, func(t *testing.T) {
+			c := mat.NewDenseWithStride(2, 2, 4, nil)
+			err := f.product(c, a, b)
+			if err != nil {
+				t.Fatalf("err = %v, want nil", err)
+			}
+			for i, want := range expected {
+				row := i / 2
+				col := i % 2
+				if got := c.At(row, col); got != want {
+					t.Fatalf("At(%d,%d) = %v, want %v", row, col, got, want)
+				}
+			}
+		})
+	}
+}
+
 func Test_MulPackedDotTransposedSimd(t *testing.T) {
 	td := []struct {
 		name     string
@@ -139,6 +204,41 @@ func Test_MulPackedDotTransposedSimd(t *testing.T) {
 				t.Errorf("raw = %v, want %v", c.Raw(), tc.expected)
 			}
 		})
+	}
+}
+
+func Test_MulPackedDotTransposedSimdSmallRowsWide(t *testing.T) {
+	previous := runtime.GOMAXPROCS(4)
+	defer runtime.GOMAXPROCS(previous)
+
+	const (
+		aRows = 1
+		aCols = 512
+		bCols = 512
+	)
+
+	aData := make([]float64, aRows*aCols)
+	bData := make([]float64, aCols*bCols)
+	for i := range aData {
+		aData[i] = float64(i%7 - 3)
+	}
+	for i := range bData {
+		bData[i] = float64(i%11 - 5)
+	}
+
+	a := mat.NewDense(aRows, aCols, aData)
+	b := mat.NewDense(aCols, bCols, bData)
+	want := mat.NewDense(aRows, bCols, make([]float64, aRows*bCols))
+	if err := mat.MulGaxpy(want, a, b); err != nil {
+		t.Fatalf("MulGaxpy err = %v, want nil", err)
+	}
+
+	got := mat.NewDense(aRows, bCols, make([]float64, aRows*bCols))
+	if err := mat.MulPackedDotTransposedSimd(got, a, mat.PackBTransposed(b)); err != nil {
+		t.Fatalf("MulPackedDotTransposedSimd err = %v, want nil", err)
+	}
+	if !reflect.DeepEqual(got.Raw(), want.Raw()) {
+		t.Errorf("raw = %v, want %v", got.Raw(), want.Raw())
 	}
 }
 
@@ -182,6 +282,37 @@ func Benchmark_Product(b *testing.B) {
 	}
 }
 
+func Benchmark_ProductStrided(b *testing.B) {
+	var sizes = sizes
+	if testing.Short() {
+		sizes = []int{1024}
+	}
+	funcs := []struct {
+		name    string
+		product func(c, a, b *mat.Dense) error
+	}{
+		{"blocked gemm", mat.MulBlockedGemm},
+		{"dot transposed simd", mat.MulDotTransposedSimd},
+		{"gni", mat.MulGonumNaive},
+	}
+
+	for _, sz := range sizes {
+		stride := sz + 8
+		aMat := newStridedBenchmarkDense(sz, sz, stride, aArr[:])
+		bMat := newStridedBenchmarkDense(sz, sz, stride, bArr[:])
+		cMat := mat.NewDenseWithStride(sz, sz, stride, nil)
+
+		for _, f := range funcs {
+			b.Run(fmt.Sprintf("%s %v", f.name, sz), func(b *testing.B) {
+				for n := 0; n < b.N; n++ {
+					_ = f.product(cMat, aMat, bMat)
+				}
+				DotResult = cMat
+			})
+		}
+	}
+}
+
 func Benchmark_ProductPacked(b *testing.B) {
 	var sizes = sizes
 	if testing.Short() {
@@ -201,6 +332,37 @@ func Benchmark_ProductPacked(b *testing.B) {
 			DotResult = cMat
 		})
 	}
+}
+
+func Benchmark_ProductPackedStrided(b *testing.B) {
+	var sizes = sizes
+	if testing.Short() {
+		sizes = []int{1024}
+	}
+	for _, sz := range sizes {
+		stride := sz + 8
+		aMat := newStridedBenchmarkDense(sz, sz, stride, aArr[:])
+		bMat := newStridedBenchmarkDense(sz, sz, stride, bArr[:])
+		packedB := mat.PackBTransposed(bMat)
+		cMat := mat.NewDenseWithStride(sz, sz, stride, nil)
+
+		b.Run(fmt.Sprintf("dot transposed simd packed %v", sz), func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				_ = mat.MulPackedDotTransposedSimd(cMat, aMat, packedB)
+			}
+			DotResult = cMat
+		})
+	}
+}
+
+func newStridedBenchmarkDense(rows, cols, stride int, values []float64) *mat.Dense {
+	data := make([]float64, (rows-1)*stride+cols)
+	valueStart := 0
+	for r := 0; r < rows; r++ {
+		copy(data[r*stride:r*stride+cols], values[valueStart:valueStart+cols])
+		valueStart += cols
+	}
+	return mat.NewDenseWithStride(rows, cols, stride, data)
 }
 
 // 16214216899
