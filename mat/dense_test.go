@@ -180,6 +180,48 @@ func Test_ProductStrided(t *testing.T) {
 	}
 }
 
+func Test_MulBlockedGemmColumnTails(t *testing.T) {
+	td := []struct {
+		name string
+		rows int
+		k    int
+		cols int
+		pad  int
+	}{
+		{"4x8 compact", 4, 5, 8, 0},
+		{"4x9 compact", 4, 5, 9, 0},
+		{"4x12 compact", 4, 5, 12, 0},
+		{"5x13 compact", 5, 7, 13, 0},
+		{"4x9 strided", 4, 5, 9, 3},
+		{"5x13 strided", 5, 7, 13, 3},
+	}
+
+	for _, tc := range td {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newPatternDense(tc.rows, tc.k, tc.k+tc.pad)
+			b := newPatternDense(tc.k, tc.cols, tc.cols+tc.pad)
+			got := mat.NewDenseWithStride(tc.rows, tc.cols, tc.cols+tc.pad, nil)
+			want := mat.NewDenseWithStride(tc.rows, tc.cols, tc.cols+tc.pad, nil)
+
+			if err := mat.MulBlockedGemm(got, a, b); err != nil {
+				t.Fatalf("MulBlockedGemm err = %v, want nil", err)
+			}
+			if err := mat.MulGonumNaive(want, a, b); err != nil {
+				t.Fatalf("MulGonumNaive err = %v, want nil", err)
+			}
+			for r := 0; r < tc.rows; r++ {
+				for c := 0; c < tc.cols; c++ {
+					gotValue := got.At(r, c)
+					wantValue := want.At(r, c)
+					if gotValue != wantValue {
+						t.Fatalf("At(%d,%d) = %v, want %v", r, c, gotValue, wantValue)
+					}
+				}
+			}
+		})
+	}
+}
+
 func Test_MulPackedDotTransposedSimd(t *testing.T) {
 	td := []struct {
 		name     string
@@ -361,6 +403,16 @@ func newStridedBenchmarkDense(rows, cols, stride int, values []float64) *mat.Den
 	for r := 0; r < rows; r++ {
 		copy(data[r*stride:r*stride+cols], values[valueStart:valueStart+cols])
 		valueStart += cols
+	}
+	return mat.NewDenseWithStride(rows, cols, stride, data)
+}
+
+func newPatternDense(rows, cols, stride int) *mat.Dense {
+	data := make([]float64, (rows-1)*stride+cols)
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			data[r*stride+c] = float64((r*cols+c)%11 - 5)
+		}
 	}
 	return mat.NewDenseWithStride(rows, cols, stride, data)
 }
