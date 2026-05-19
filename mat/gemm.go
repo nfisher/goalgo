@@ -15,6 +15,11 @@ func MulBlockedGemm(c, a, b *Dense) error {
 	bCols := b.Columns()
 	compact := denseAllCompact(c, a, b)
 
+	if shouldUsePackedBlockedGemm(aRows, aCols, bCols) {
+		mulBlockedGemmPacked(c, a, b)
+		return nil
+	}
+
 	if aRows*bCols < minParallelCells {
 		if compact {
 			mulBlockedGemmRows(c.data, a.data, b.data, aCols, bCols, 0, aRows)

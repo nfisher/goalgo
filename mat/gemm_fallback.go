@@ -13,3 +13,8 @@ func gemmKernel4x8SIMD(c, a, b []float64, k, aStride, bStride, cStride, row, col
 	gemmKernel4x4Strided(c, a, b, k, aStride, bStride, cStride, row, col)
 	gemmKernel4x4Strided(c, a, b, k, aStride, bStride, cStride, row, col+blockedGemmCols)
 }
+
+func gemmKernel4x8AddSIMD(c, a, b []float64, k, aStride, bStride, cStride, row, col int) {
+	gemmKernel4x4AddStrided(c, a, b, k, aStride, bStride, cStride, row, col)
+	gemmKernel4x4AddStrided(c, a, b, k, aStride, bStride, cStride, row, col+blockedGemmCols)
+}

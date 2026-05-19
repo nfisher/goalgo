@@ -192,6 +192,7 @@ func Test_MulBlockedGemmColumnTails(t *testing.T) {
 		{"4x9 compact", 4, 5, 9, 0},
 		{"4x12 compact", 4, 5, 12, 0},
 		{"5x13 compact", 5, 7, 13, 0},
+		{"4x8 split k", 4, 2051, 8, 0},
 		{"4x9 strided", 4, 5, 9, 3},
 		{"5x13 strided", 5, 7, 13, 3},
 	}
@@ -203,20 +204,30 @@ func Test_MulBlockedGemmColumnTails(t *testing.T) {
 			got := mat.NewDenseWithStride(tc.rows, tc.cols, tc.cols+tc.pad, nil)
 			want := mat.NewDenseWithStride(tc.rows, tc.cols, tc.cols+tc.pad, nil)
 
-			if err := mat.MulBlockedGemm(got, a, b); err != nil {
-				t.Fatalf("MulBlockedGemm err = %v, want nil", err)
-			}
 			if err := mat.MulGonumNaive(want, a, b); err != nil {
 				t.Fatalf("MulGonumNaive err = %v, want nil", err)
 			}
-			for r := 0; r < tc.rows; r++ {
-				for c := 0; c < tc.cols; c++ {
-					gotValue := got.At(r, c)
-					wantValue := want.At(r, c)
-					if gotValue != wantValue {
-						t.Fatalf("At(%d,%d) = %v, want %v", r, c, gotValue, wantValue)
+			for _, product := range []struct {
+				name string
+				fn   func(c, a, b *mat.Dense) error
+			}{
+				{"blocked", mat.MulBlockedGemm},
+				{"packed", mat.MulBlockedGemmPacked},
+			} {
+				t.Run(product.name, func(t *testing.T) {
+					if err := product.fn(got, a, b); err != nil {
+						t.Fatalf("%s err = %v, want nil", product.name, err)
 					}
-				}
+					for r := 0; r < tc.rows; r++ {
+						for c := 0; c < tc.cols; c++ {
+							gotValue := got.At(r, c)
+							wantValue := want.At(r, c)
+							if gotValue != wantValue {
+								t.Fatalf("At(%d,%d) = %v, want %v", r, c, gotValue, wantValue)
+							}
+						}
+					}
+				})
 			}
 		})
 	}
@@ -244,6 +255,44 @@ func Test_MulPackedDotTransposedSimd(t *testing.T) {
 			}
 			if !reflect.DeepEqual(c.Raw(), tc.expected) {
 				t.Errorf("raw = %v, want %v", c.Raw(), tc.expected)
+			}
+		})
+	}
+}
+
+func Test_MulPackedGemm(t *testing.T) {
+	td := []struct {
+		name string
+		rows int
+		k    int
+		cols int
+		pad  int
+	}{
+		{"compact", 8, 17, 10, 0},
+		{"strided", 8, 17, 10, 3},
+		{"split k", 8, 33, 10, 0},
+	}
+
+	for _, tc := range td {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newPatternDense(tc.rows, tc.k, tc.k+tc.pad)
+			b := newPatternDense(tc.k, tc.cols, tc.cols+tc.pad)
+			got := mat.NewDenseWithStride(tc.rows, tc.cols, tc.cols+tc.pad, nil)
+			want := mat.NewDenseWithStride(tc.rows, tc.cols, tc.cols+tc.pad, nil)
+
+			if err := mat.MulGonumNaive(want, a, b); err != nil {
+				t.Fatalf("MulGonumNaive err = %v, want nil", err)
+			}
+			packed := mat.PackGemmBWithBlocks(b, 16, 6)
+			if err := mat.MulPackedGemm(got, a, packed); err != nil {
+				t.Fatalf("MulPackedGemm err = %v, want nil", err)
+			}
+			for r := 0; r < tc.rows; r++ {
+				for c := 0; c < tc.cols; c++ {
+					if gotValue, wantValue := got.At(r, c), want.At(r, c); gotValue != wantValue {
+						t.Fatalf("At(%d,%d) = %v, want %v", r, c, gotValue, wantValue)
+					}
+				}
 			}
 		})
 	}
@@ -352,6 +401,67 @@ func Benchmark_ProductStrided(b *testing.B) {
 				DotResult = cMat
 			})
 		}
+	}
+}
+
+func Benchmark_ProductBlockedPacked(b *testing.B) {
+	var sizes = sizes
+	if testing.Short() {
+		sizes = []int{1024}
+	}
+	for _, sz := range sizes {
+		dim := sz * sz
+		aMat := mat.NewDense(sz, sz, aArr[:dim])
+		bMat := mat.NewDense(sz, sz, bArr[:dim])
+		cMat := mat.NewDense(sz, sz, make([]float64, dim))
+
+		b.Run(fmt.Sprintf("compact %v", sz), func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				_ = mat.MulBlockedGemmPacked(cMat, aMat, bMat)
+			}
+			DotResult = cMat
+		})
+	}
+}
+
+func Benchmark_ProductBlockedPackedStrided(b *testing.B) {
+	var sizes = sizes
+	if testing.Short() {
+		sizes = []int{1024}
+	}
+	for _, sz := range sizes {
+		stride := sz + 8
+		aMat := newStridedBenchmarkDense(sz, sz, stride, aArr[:])
+		bMat := newStridedBenchmarkDense(sz, sz, stride, bArr[:])
+		cMat := mat.NewDenseWithStride(sz, sz, stride, nil)
+
+		b.Run(fmt.Sprintf("strided %v", sz), func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				_ = mat.MulBlockedGemmPacked(cMat, aMat, bMat)
+			}
+			DotResult = cMat
+		})
+	}
+}
+
+func Benchmark_ProductReusablePackedGemm(b *testing.B) {
+	var sizes = sizes
+	if testing.Short() {
+		sizes = []int{1024}
+	}
+	for _, sz := range sizes {
+		dim := sz * sz
+		aMat := mat.NewDense(sz, sz, aArr[:dim])
+		bMat := mat.NewDense(sz, sz, bArr[:dim])
+		packedB := mat.PackGemmB(bMat)
+		cMat := mat.NewDense(sz, sz, make([]float64, dim))
+
+		b.Run(fmt.Sprintf("compact %v", sz), func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				_ = mat.MulPackedGemm(cMat, aMat, packedB)
+			}
+			DotResult = cMat
+		})
 	}
 }
 

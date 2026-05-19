@@ -10,3 +10,6 @@ func gemmKernel4x4SIMD(c, a, b []float64, k, aStride, bStride, cStride, row, col
 
 //go:noescape
 func gemmKernel4x8SIMD(c, a, b []float64, k, aStride, bStride, cStride, row, col int)
+
+//go:noescape
+func gemmKernel4x8AddSIMD(c, a, b []float64, k, aStride, bStride, cStride, row, col int)
