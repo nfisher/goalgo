@@ -1,0 +1,92 @@
+#include "textflag.h"
+
+// func gemmKernel4x4SIMD(c, a, b []float64, k, aStride, bStride, cStride, row, col int)
+TEXT ·gemmKernel4x4SIMD(SB), NOSPLIT, $0-120
+	MOVD c_base+0(FP), R0
+	MOVD a_base+24(FP), R1
+	MOVD b_base+48(FP), R2
+	MOVD k+72(FP), R3
+	MOVD aStride+80(FP), R4
+	MOVD bStride+88(FP), R5
+	MOVD cStride+96(FP), R6
+	MOVD row+104(FP), R7
+	MOVD col+112(FP), R8
+
+	LSL $3, R4, R4
+	LSL $3, R5, R5
+	LSL $3, R6, R6
+	LSL $3, R8, R8
+
+	MUL R4, R7, R9
+	ADD R9, R1, R1
+	ADD R8, R2, R2
+	MUL R6, R7, R9
+	ADD R9, R0, R0
+	ADD R8, R0, R0
+
+	ADD R4, R1, R9
+	ADD R4, R9, R10
+	ADD R4, R10, R11
+
+	MOVD R0, R12
+	ADD R6, R12, R13
+	ADD R6, R13, R14
+	ADD R6, R14, R15
+
+	VEOR V0.B16, V0.B16, V0.B16
+	VEOR V1.B16, V1.B16, V1.B16
+	VEOR V2.B16, V2.B16, V2.B16
+	VEOR V3.B16, V3.B16, V3.B16
+	VEOR V4.B16, V4.B16, V4.B16
+	VEOR V5.B16, V5.B16, V5.B16
+	VEOR V6.B16, V6.B16, V6.B16
+	VEOR V7.B16, V7.B16, V7.B16
+
+	CBZ R3, gemm4x4_store
+
+gemm4x4_loop:
+	VLD1 (R2), [V8.D2]
+	ADD $16, R2, R16
+	VLD1 (R16), [V9.D2]
+
+	VLD1R (R1), [V10.D2]
+	VFMLA V10.D2, V8.D2, V0.D2
+	VFMLA V10.D2, V9.D2, V1.D2
+
+	VLD1R (R9), [V10.D2]
+	VFMLA V10.D2, V8.D2, V2.D2
+	VFMLA V10.D2, V9.D2, V3.D2
+
+	VLD1R (R10), [V10.D2]
+	VFMLA V10.D2, V8.D2, V4.D2
+	VFMLA V10.D2, V9.D2, V5.D2
+
+	VLD1R (R11), [V10.D2]
+	VFMLA V10.D2, V8.D2, V6.D2
+	VFMLA V10.D2, V9.D2, V7.D2
+
+	ADD $8, R1, R1
+	ADD $8, R9, R9
+	ADD $8, R10, R10
+	ADD $8, R11, R11
+	ADD R5, R2, R2
+	SUBS $1, R3, R3
+	BNE gemm4x4_loop
+
+gemm4x4_store:
+	VST1 [V0.D2], (R12)
+	ADD $16, R12, R16
+	VST1 [V1.D2], (R16)
+
+	VST1 [V2.D2], (R13)
+	ADD $16, R13, R16
+	VST1 [V3.D2], (R16)
+
+	VST1 [V4.D2], (R14)
+	ADD $16, R14, R16
+	VST1 [V5.D2], (R16)
+
+	VST1 [V6.D2], (R15)
+	ADD $16, R15, R16
+	VST1 [V7.D2], (R16)
+	RET
