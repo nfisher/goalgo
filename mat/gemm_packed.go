@@ -6,6 +6,10 @@ const (
 	packedGemmKBlock   = 2048
 	packedGemmColBlock = 256
 	packedGemmMinDim   = 1024
+	packedGemmMinRows  = 512
+	packedGemmMinK     = 1024
+	packedGemmMinCols  = 1024
+	packedGemmMinOps   = 512 * 1024 * 1024
 )
 
 // PackedGemmB stores B in packed K x N panels for the blocked GEMM
@@ -97,10 +101,16 @@ func MulPackedGemm(c, a *Dense, packed *PackedGemmB) error {
 }
 
 func shouldUsePackedBlockedGemm(aRows, aCols, bCols int) bool {
-	return hasGemmKernel4x8SIMD &&
-		aRows >= packedGemmMinDim &&
-		aCols >= packedGemmMinDim &&
-		bCols >= packedGemmMinDim
+	if !hasGemmKernel4x8SIMD {
+		return false
+	}
+	if aRows >= packedGemmMinDim && aCols >= packedGemmMinDim && bCols >= packedGemmMinDim {
+		return true
+	}
+	return aRows >= packedGemmMinRows &&
+		aCols >= packedGemmMinK &&
+		bCols >= packedGemmMinCols &&
+		aRows*aCols*bCols >= packedGemmMinOps
 }
 
 func mulBlockedGemmPacked(c, a, b *Dense) {

@@ -504,6 +504,42 @@ func Benchmark_ProductSmallRowsWide(b *testing.B) {
 	}
 }
 
+func Benchmark_ProductRectangularPacked(b *testing.B) {
+	const (
+		rows = 512
+		k    = 1024
+		cols = 1024
+	)
+	aMat := mat.NewDense(rows, k, aArr[:rows*k])
+	bMat := mat.NewDense(k, cols, bArr[:k*cols])
+	cMat := mat.NewDense(rows, cols, make([]float64, rows*cols))
+	packedB := mat.PackGemmB(bMat)
+
+	funcs := []struct {
+		name    string
+		product func(c, a, b *mat.Dense) error
+	}{
+		{"blocked auto", mat.MulBlockedGemm},
+		{"packed one-shot", mat.MulBlockedGemmPacked},
+		{"dot transposed simd", mat.MulDotTransposedSimd},
+	}
+
+	for _, f := range funcs {
+		b.Run(f.name, func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				_ = f.product(cMat, aMat, bMat)
+			}
+			DotResult = cMat
+		})
+	}
+	b.Run("packed reusable", func(b *testing.B) {
+		for n := 0; n < b.N; n++ {
+			_ = mat.MulPackedGemm(cMat, aMat, packedB)
+		}
+		DotResult = cMat
+	})
+}
+
 func Benchmark_ProductReusablePackedGemm(b *testing.B) {
 	var sizes = sizes
 	if testing.Short() {
