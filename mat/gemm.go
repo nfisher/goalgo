@@ -15,6 +15,10 @@ func MulBlockedGemm(c, a, b *Dense) error {
 	bCols := b.Columns()
 	compact := denseAllCompact(c, a, b)
 
+	if shouldUseSmallRowTransposedDot(aRows, aCols, bCols) {
+		return MulDotTransposedSimd(c, a, b)
+	}
+
 	if shouldUsePackedBlockedGemm(aRows, aCols, bCols) {
 		mulBlockedGemmPacked(c, a, b)
 		return nil
@@ -55,6 +59,13 @@ func MulBlockedGemm(c, a, b *Dense) error {
 		})
 	}
 	return nil
+}
+
+func shouldUseSmallRowTransposedDot(aRows, aCols, bCols int) bool {
+	if aRows == 0 || aRows >= blockedGemmRows || bCols < 64 || runtime.GOMAXPROCS(0) < 2 {
+		return false
+	}
+	return aCols*bCols >= minColumnParallelOps/8
 }
 
 func mulBlockedGemmRows(c, a, b []float64, k, cols, rowStart, rowEnd int) {

@@ -333,6 +333,36 @@ func Test_MulPackedDotTransposedSimdSmallRowsWide(t *testing.T) {
 	}
 }
 
+func Test_MulBlockedGemmSmallRowsWide(t *testing.T) {
+	previous := runtime.GOMAXPROCS(4)
+	defer runtime.GOMAXPROCS(previous)
+
+	const (
+		aRows = 3
+		aCols = 256
+		bCols = 256
+	)
+
+	a := newPatternDense(aRows, aCols, aCols+3)
+	b := newPatternDense(aCols, bCols, bCols+5)
+	got := mat.NewDenseWithStride(aRows, bCols, bCols+7, nil)
+	want := mat.NewDenseWithStride(aRows, bCols, bCols+7, nil)
+
+	if err := mat.MulGonumNaive(want, a, b); err != nil {
+		t.Fatalf("MulGonumNaive err = %v, want nil", err)
+	}
+	if err := mat.MulBlockedGemm(got, a, b); err != nil {
+		t.Fatalf("MulBlockedGemm err = %v, want nil", err)
+	}
+	for r := 0; r < aRows; r++ {
+		for c := 0; c < bCols; c++ {
+			if gotValue, wantValue := got.At(r, c), want.At(r, c); gotValue != wantValue {
+				t.Fatalf("At(%d,%d) = %v, want %v", r, c, gotValue, wantValue)
+			}
+		}
+	}
+}
+
 func Benchmark_Dot(b *testing.B) {
 	if testing.Short() {
 		b.Skip()
@@ -438,6 +468,36 @@ func Benchmark_ProductBlockedPackedStrided(b *testing.B) {
 		b.Run(fmt.Sprintf("strided %v", sz), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
 				_ = mat.MulBlockedGemmPacked(cMat, aMat, bMat)
+			}
+			DotResult = cMat
+		})
+	}
+}
+
+func Benchmark_ProductSmallRowsWide(b *testing.B) {
+	const (
+		rows = 3
+		k    = 512
+		cols = 512
+	)
+
+	aMat := mat.NewDense(rows, k, aArr[:rows*k])
+	bMat := mat.NewDense(k, cols, bArr[:k*cols])
+	cMat := mat.NewDense(rows, cols, make([]float64, rows*cols))
+
+	funcs := []struct {
+		name    string
+		product func(c, a, b *mat.Dense) error
+	}{
+		{"blocked gemm", mat.MulBlockedGemm},
+		{"dot transposed simd", mat.MulDotTransposedSimd},
+		{"gni", mat.MulGonumNaive},
+	}
+
+	for _, f := range funcs {
+		b.Run(f.name, func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				_ = f.product(cMat, aMat, bMat)
 			}
 			DotResult = cMat
 		})
