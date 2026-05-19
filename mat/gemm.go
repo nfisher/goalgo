@@ -61,6 +61,11 @@ func mulBlockedGemmRows(c, a, b []float64, k, cols, rowStart, rowEnd int) {
 	i := rowStart
 	for ; i+blockedGemmRows <= rowEnd; i += blockedGemmRows {
 		j := 0
+		if hasGemmKernel4x12SIMD {
+			for ; j+3*blockedGemmCols <= cols; j += 3 * blockedGemmCols {
+				gemmKernel4x12SIMD(c, a, b, k, k, cols, cols, i, j)
+			}
+		}
 		if hasGemmKernel4x8SIMD {
 			for ; j+2*blockedGemmCols <= cols; j += 2 * blockedGemmCols {
 				gemmKernel4x8SIMD(c, a, b, k, k, cols, cols, i, j)
@@ -209,6 +214,11 @@ func mulBlockedGemmRowsStrided(c, a, b []float64, k, cols, aStride, bStride, cSt
 	i := rowStart
 	for ; i+blockedGemmRows <= rowEnd; i += blockedGemmRows {
 		j := 0
+		if hasGemmKernel4x12SIMD {
+			for ; j+3*blockedGemmCols <= cols; j += 3 * blockedGemmCols {
+				gemmKernel4x12SIMD(c, a, b, k, aStride, bStride, cStride, i, j)
+			}
+		}
 		if hasGemmKernel4x8SIMD {
 			for ; j+2*blockedGemmCols <= cols; j += 2 * blockedGemmCols {
 				gemmKernel4x8SIMD(c, a, b, k, aStride, bStride, cStride, i, j)

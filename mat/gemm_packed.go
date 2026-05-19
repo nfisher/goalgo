@@ -153,11 +153,11 @@ func mulBlockedGemmPacked(c, a, b *Dense) {
 			add := kStart != 0
 
 			if workers < 2 {
-				mulPackedGemmPanelRows(cPanel, aPanel, panel, kLen, colLen, a.stride, c.stride, 0, aRows, add)
+				mulPackedGemmPanelRowsAuto(cPanel, aPanel, panel, kLen, colLen, a.stride, c.stride, 0, aRows, add)
 				continue
 			}
 			pool.parallel(0, aRows, rowsPerWorker, func(start, end int) {
-				mulPackedGemmPanelRows(cPanel, aPanel, panel, kLen, colLen, a.stride, c.stride, start, end, add)
+				mulPackedGemmPanelRowsAuto(cPanel, aPanel, panel, kLen, colLen, a.stride, c.stride, start, end, add)
 			})
 		}
 	}
@@ -189,11 +189,11 @@ func mulPackedGemm(c, a *Dense, packed *PackedGemmB) {
 		add := panel.kStart != 0
 
 		if workers < 2 {
-			mulPackedGemmPanelRows(cPanel, aPanel, bPanel, panel.kLen, panel.colLen, a.stride, c.stride, 0, aRows, add)
+			mulPackedGemmPanelRowsAuto(cPanel, aPanel, bPanel, panel.kLen, panel.colLen, a.stride, c.stride, 0, aRows, add)
 			continue
 		}
 		pool.parallel(0, aRows, rowsPerWorker, func(start, end int) {
-			mulPackedGemmPanelRows(cPanel, aPanel, bPanel, panel.kLen, panel.colLen, a.stride, c.stride, start, end, add)
+			mulPackedGemmPanelRowsAuto(cPanel, aPanel, bPanel, panel.kLen, panel.colLen, a.stride, c.stride, start, end, add)
 		})
 	}
 }
@@ -223,10 +223,80 @@ func zeroDense(c *Dense, rows, cols int) {
 	}
 }
 
+func mulPackedGemmPanelRowsAuto(c, a, b []float64, k, cols, aStride, cStride, rowStart, rowEnd int, add bool) {
+	if shouldPackGemmA(k, cols, rowEnd-rowStart) {
+		mulPackedGemmPanelRowsPackedA(c, a, b, k, cols, aStride, cStride, rowStart, rowEnd, add)
+		return
+	}
+	mulPackedGemmPanelRows(c, a, b, k, cols, aStride, cStride, rowStart, rowEnd, add)
+}
+
+func shouldPackGemmA(k, cols, rows int) bool {
+	return hasGemmKernel4x12SIMD && rows >= blockedGemmRows && k >= 128 && cols >= 3*blockedGemmCols
+}
+
+func mulPackedGemmPanelRowsPackedA(c, a, b []float64, k, cols, aStride, cStride, rowStart, rowEnd int, add bool) {
+	aBlock := make([]float64, blockedGemmRows*k)
+	i := rowStart
+	for ; i+blockedGemmRows <= rowEnd; i += blockedGemmRows {
+		packGemmARows(aBlock, a, i, k, aStride)
+		cBlock := c[i*cStride:]
+		j := 0
+		for ; j+3*blockedGemmCols <= cols; j += 3 * blockedGemmCols {
+			if add {
+				gemmKernel4x12AddSIMD(cBlock, aBlock, b, k, k, cols, cStride, 0, j)
+			} else {
+				gemmKernel4x12SIMD(cBlock, aBlock, b, k, k, cols, cStride, 0, j)
+			}
+		}
+		for ; j+2*blockedGemmCols <= cols; j += 2 * blockedGemmCols {
+			if add {
+				gemmKernel4x8AddSIMD(cBlock, aBlock, b, k, k, cols, cStride, 0, j)
+			} else {
+				gemmKernel4x8SIMD(cBlock, aBlock, b, k, k, cols, cStride, 0, j)
+			}
+		}
+		for ; j+blockedGemmCols <= cols; j += blockedGemmCols {
+			if add {
+				gemmKernel4x4AddStrided(cBlock, aBlock, b, k, k, cols, cStride, 0, j)
+			} else if hasGemmKernel4x4SIMD {
+				gemmKernel4x4SIMD(cBlock, aBlock, b, k, k, cols, cStride, 0, j)
+			} else {
+				gemmKernel4x4Strided(cBlock, aBlock, b, k, k, cols, cStride, 0, j)
+			}
+		}
+		for ; j < cols; j++ {
+			if add {
+				gemmKernel4x1AddStrided(cBlock, aBlock, b, k, k, cols, cStride, 0, j)
+			} else {
+				gemmKernel4x1Strided(cBlock, aBlock, b, k, k, cols, cStride, 0, j)
+			}
+		}
+	}
+
+	if i < rowEnd {
+		mulPackedGemmPanelRows(c, a, b, k, cols, aStride, cStride, i, rowEnd, add)
+	}
+}
+
+func packGemmARows(dst, a []float64, row, k, stride int) {
+	for r := 0; r < blockedGemmRows; r++ {
+		srcStart := (row + r) * stride
+		copy(dst[r*k:(r+1)*k], a[srcStart:srcStart+k])
+	}
+}
+
 func mulPackedGemmPanelRows(c, a, b []float64, k, cols, aStride, cStride, rowStart, rowEnd int, add bool) {
 	i := rowStart
 	for ; i+blockedGemmRows <= rowEnd; i += blockedGemmRows {
 		j := 0
+		for ; j+3*blockedGemmCols <= cols; j += 3 * blockedGemmCols {
+			if add {
+				gemmKernel4x12AddSIMD(c, a, b, k, aStride, cols, cStride, i, j)
+			} else {
+				gemmKernel4x12SIMD(c, a, b, k, aStride, cols, cStride, i, j)
+			}
+		}
 		for ; j+2*blockedGemmCols <= cols; j += 2 * blockedGemmCols {
 			if add {
 				gemmKernel4x8AddSIMD(c, a, b, k, aStride, cols, cStride, i, j)
